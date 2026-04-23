@@ -1,0 +1,1 @@
+Pull Requests são bem-vindos. Para mudanças maiores, abra uma Issue primeiro.
