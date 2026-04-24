@@ -13,7 +13,6 @@
     <name>Java-NFS-e</name>
     <description>Biblioteca Java para comunicação com a API Nacional de NFS-e (Nota Fiscal de Serviço Eletrônica)</description>
     <url>https://github.com/DeivideD/Java_NFSe</url>
-
     <licenses>
         <license>
             <name>MIT License</name>
@@ -21,7 +20,6 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
-
     <developers>
         <developer>
             <id>DeivideD</id>
@@ -42,10 +40,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
-        <java.version>21</java.version>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <maven.compiler.release>21</maven.compiler.release>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
 
         <!-- Dependências -->
         <lombok.version>1.18.38</lombok.version>
@@ -312,7 +310,5 @@
                 </plugins>
             </build>
         </profile>
-
     </profiles>
-
 </project>
