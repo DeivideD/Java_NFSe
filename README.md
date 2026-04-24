@@ -28,7 +28,7 @@ Biblioteca Java para comunicação com a **API Nacional de NFS-e** (Nota Fiscal 
 
 ```xml
 <dependency>
-    <groupId>com.coffeetecnologia</groupId>
+    <groupId>io.github.deivided</groupId>
     <artifactId>java-nfse</artifactId>
     <version>1.0.0</version>
 </dependency>
