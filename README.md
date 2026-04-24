@@ -34,8 +34,6 @@ Biblioteca Java para comunicação com a **API Nacional de NFS-e** (Nota Fiscal 
 </dependency>
 ```
 
-> Em breve no Maven Central.
-
 ## Uso rápido
 
 ### Sincronizar NFS-e recebidas
