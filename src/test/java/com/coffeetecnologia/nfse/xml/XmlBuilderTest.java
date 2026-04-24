@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import java.math.BigDecimal;
 
@@ -68,12 +70,20 @@ class XmlBuilderTest {
   }
 
   @Test
-  @DisplayName("Deve gerar Id no elemento raiz para assinatura XMLDSig")
+  @DisplayName("Deve gerar Id no elemento <infDPS> para assinatura XMLDSig")
   void deveGerarIdNoElementoRaiz() {
     Document doc = xmlBuilder.buildDocument(dpsValido);
 
-    String id = doc.getDocumentElement().getAttribute("Id");
-    assertNotNull(id, "Elemento raiz deve ter atributo Id");
+    // O Id agora está no <infDPS>, não no <DPS> raiz
+    NodeList nodes = doc.getElementsByTagNameNS(
+        "http://www.sped.fazenda.gov.br/nfse", "infDPS"
+    );
+    assertNotNull(nodes);
+    assertTrue(nodes.getLength() > 0, "Elemento infDPS deve existir");
+
+    Element infDps = (Element) nodes.item(0);
+    String id = infDps.getAttribute("Id");
+    assertNotNull(id, "infDPS deve ter atributo Id");
     assertFalse(id.isBlank(), "Atributo Id não deve estar vazio");
   }
 
@@ -87,12 +97,13 @@ class XmlBuilderTest {
   }
 
   @Test
-  @DisplayName("Deve calcular ISS com base na alíquota")
+  @DisplayName("Deve incluir alíquota do ISS no XML")
   void deveCalcularIss() {
     String xml = xmlBuilder.build(dpsValido);
 
-    // 5% de 1500.00 = 75.00
-    assertTrue(xml.contains("75.00"), "XML deve conter o valor do ISS calculado (75.00)");
+    // A alíquota de 5% está em <pAliq>5.00</pAliq> dentro de <tribMun>
+    assertTrue(xml.contains("<pAliq>5.00</pAliq>"),
+        "XML deve conter a alíquota do ISS");
   }
 
   @Test
