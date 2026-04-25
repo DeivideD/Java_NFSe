@@ -7,7 +7,7 @@
 
     <groupId>io.github.deivided</groupId>
     <artifactId>java-nfse</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <packaging>jar</packaging>
 
     <name>Java-NFS-e</name>
