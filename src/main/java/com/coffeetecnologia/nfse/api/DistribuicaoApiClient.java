@@ -21,13 +21,6 @@ import java.util.zip.GZIPInputStream;
 /**
  * Cliente para a API de Distribuição de DF-e para Contribuintes.
  *
- * Endpoint base (Produção Restrita):
- *   https://adn.producaorestrita.nfse.gov.br/contribuintes
- *
- * Endpoints implementados:
- *   GET /DFe/{NSU}                         → Busca documento por NSU
- *   GET /DFe/{NSU}?lote=true               → Busca lote a partir do NSU
- *   GET /NFSe/{ChaveAcesso}/Eventos        → Busca eventos de uma NFS-e
  */
 public class DistribuicaoApiClient {
 
@@ -37,6 +30,10 @@ public class DistribuicaoApiClient {
       "https://adn.producaorestrita.nfse.gov.br/contribuintes";
   private static final String BASE_PRODUCAO =
       "https://adn.nfse.gov.br/contribuintes";
+
+  private static final int MAX_RETRIES = 3;
+  private static final long RATE_LIMIT_WAIT_MS = 10_000L; // 10s
+  private static final long RETRY_WAIT_MS = 5_000L;       // 5s entre retries normais
 
   private final NfseConfig config;
   private final HttpClient httpClient;
@@ -56,44 +53,33 @@ public class DistribuicaoApiClient {
 
   /**
    * Busca um único documento pelo NSU.
-   *
    * GET /DFe/{NSU}?lote=false
-   *
-   * @param nsu Número Sequencial Único do documento
    */
   public DfeResponse buscarPorNsu(long nsu) {
     String url = getBaseUrl() + "/DFe/" + nsu + "?lote=false";
     log.info("Buscando DF-e por NSU: {}", nsu);
-    return get(url);
+    return getComRetry(url);
   }
 
   /**
    * Busca um lote de documentos a partir de um NSU.
-   * Retorna até 50 documentos com NSU >= ao informado.
-   *
    * GET /DFe/{NSU}?lote=true
-   *
-   * @param nsuInicial NSU a partir do qual buscar
    */
   public DfeResponse buscarLote(long nsuInicial) {
     String url = getBaseUrl() + "/DFe/" + nsuInicial + "?lote=true";
     log.info("Buscando lote de DF-e a partir do NSU: {}", nsuInicial);
-    return get(url);
+    return getComRetry(url);
   }
 
   /**
-   * Busca lote filtrando por CNPJ específico.
-   *
+   * Busca lote filtrando por CNPJ.
    * GET /DFe/{NSU}?cnpjConsulta={cnpj}&lote=true
-   *
-   * @param nsuInicial  NSU inicial
-   * @param cnpj        CNPJ a filtrar (apenas dígitos)
    */
   public DfeResponse buscarLotePorCnpj(long nsuInicial, String cnpj) {
     String url = getBaseUrl() + "/DFe/" + nsuInicial
         + "?cnpjConsulta=" + cnpj + "&lote=true";
     log.info("Buscando lote por CNPJ {} a partir do NSU: {}", cnpj, nsuInicial);
-    return get(url);
+    return getComRetry(url);
   }
 
   // ========================
@@ -101,27 +87,21 @@ public class DistribuicaoApiClient {
   // ========================
 
   /**
-   * Busca todos os eventos vinculados a uma NFS-e.
-   *
+   * Busca eventos de uma NFS-e.
    * GET /NFSe/{ChaveAcesso}/Eventos
-   *
-   * @param chaveAcesso chave de acesso da NFS-e (50 dígitos)
    */
   public DfeResponse buscarEventos(String chaveAcesso) {
     String url = getBaseUrl() + "/NFSe/" + chaveAcesso + "/Eventos";
     log.info("Buscando eventos da NFS-e: {}", chaveAcesso);
-    return get(url);
+    return getComRetry(url);
   }
 
   // ========================
-  // Utilitário de descompressão
+  // Descompressão
   // ========================
 
   /**
-   * Descomprime o campo ArquivoXml (GZip + Base64) retornado pela API.
-   *
-   * @param arquivoXmlGZipB64 valor do campo ArquivoXml do documento
-   * @return XML do documento como String
+   * Descomprime o campo ArquivoXml (GZip + Base64).
    */
   public String descomprimirXml(String arquivoXmlGZipB64) {
     try {
@@ -136,44 +116,90 @@ public class DistribuicaoApiClient {
   }
 
   // ========================
-  // HTTP
+  // HTTP com Retry + Rate Limit
   // ========================
 
-  private DfeResponse get(String url) {
-    try {
-      HttpRequest request = HttpRequest.newBuilder()
-          .uri(URI.create(url))
-          .timeout(config.getTimeout())
-          .header("Accept", "application/json")
-          .GET()
-          .build();
+  private DfeResponse getComRetry(String url) {
+    int tentativa = 0;
 
-      HttpResponse<String> response = httpClient.send(
-          request, HttpResponse.BodyHandlers.ofString()
-      );
+    while (tentativa < MAX_RETRIES) {
+      tentativa++;
+      try {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(config.getTimeout())
+            .header("Accept", "application/json")
+            .GET()
+            .build();
 
-      log.debug("GET {} → HTTP {}", url, response.statusCode());
-
-      if (response.statusCode() == 404) {
-        log.info("Nenhum documento encontrado para a consulta.");
-        DfeResponse empty = new DfeResponse();
-        empty.setStatusProcessamento("NENHUM_DOCUMENTO_LOCALIZADO");
-        return empty;
-      }
-
-      if (response.statusCode() != 200) {
-        throw new NfseException(
-            "Erro na API de distribuição. HTTP " + response.statusCode()
-                + ": " + response.body()
+        HttpResponse<String> response = httpClient.send(
+            request, HttpResponse.BodyHandlers.ofString()
         );
+
+        int status = response.statusCode();
+        log.debug("GET {} → HTTP {}", url, status);
+
+        // 404 — sem documentos
+        if (status == 404) {
+          log.info("Nenhum documento encontrado.");
+          DfeResponse empty = new DfeResponse();
+          empty.setStatusProcessamento("NENHUM_DOCUMENTO_LOCALIZADO");
+          return empty;
+        }
+
+        // 429 — rate limit → aguarda 60s e retenta
+        if (status == 429) {
+          log.warn("Rate limit atingido (429). Aguardando {}s antes de retentar... " +
+              "(tentativa {}/{})", RATE_LIMIT_WAIT_MS / 1000, tentativa, MAX_RETRIES);
+          sleep(RATE_LIMIT_WAIT_MS);
+          continue;
+        }
+
+        // 200 — sucesso
+        if (status == 200) {
+          return objectMapper.readValue(response.body(), DfeResponse.class);
+        }
+
+        // Outros erros — retenta com delay menor
+        log.warn("Erro HTTP {} na tentativa {}/{}. Aguardando {}s...",
+            status, tentativa, MAX_RETRIES, RETRY_WAIT_MS / 1000);
+
+        if (tentativa < MAX_RETRIES) {
+          sleep(RETRY_WAIT_MS);
+        } else {
+          throw new NfseException(
+              "Erro na API de distribuição após " + MAX_RETRIES +
+                  " tentativas. HTTP " + status + ": " + response.body()
+          );
+        }
+
+      } catch (NfseException e) {
+        throw e;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new NfseException("Thread interrompida durante retry.", e);
+      } catch (Exception e) {
+        if (tentativa < MAX_RETRIES) {
+          log.warn("Erro na tentativa {}/{}: {}. Retentando...",
+              tentativa, MAX_RETRIES, e.getMessage());
+          sleep(RETRY_WAIT_MS);
+        } else {
+          throw new NfseException(
+              "Erro ao consultar API de distribuição após " +
+                  MAX_RETRIES + " tentativas: " + url, e
+          );
+        }
       }
+    }
 
-      return objectMapper.readValue(response.body(), DfeResponse.class);
+    throw new NfseException("Máximo de tentativas atingido para: " + url);
+  }
 
-    } catch (NfseException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new NfseException("Erro ao consultar API de distribuição: " + url, e);
+  private void sleep(long ms) {
+    try {
+      Thread.sleep(ms);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
