@@ -1,13 +1,19 @@
 package com.coffeetecnologia.nfse.api;
 
+import com.coffeetecnologia.nfse.api.request.EventoRequest;
 import com.coffeetecnologia.nfse.api.request.NfsePostRequest;
+import com.coffeetecnologia.nfse.api.response.EventoResponse;
 import com.coffeetecnologia.nfse.api.response.NfsePostResponse;
 import com.coffeetecnologia.nfse.config.NfseConfig;
 import com.coffeetecnologia.nfse.exception.NfseException;
 import com.coffeetecnologia.nfse.model.dps.Dps;
+import com.coffeetecnologia.nfse.model.dps.Substituicao;
+import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
+import com.coffeetecnologia.nfse.model.evento.ResultadoEvento;
 import com.coffeetecnologia.nfse.model.nfse.Nfse;
 import com.coffeetecnologia.nfse.model.nfse.SituacaoNfse;
 import com.coffeetecnologia.nfse.xml.XmlBuilder;
+import com.coffeetecnologia.nfse.xml.XmlEventoBuilder;
 import com.coffeetecnologia.nfse.xml.XmlSigner;
 import com.coffeetecnologia.nfse.xml.XmlValidator;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -50,6 +56,7 @@ public class NfseApiClient {
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final XmlBuilder xmlBuilder;
+  private final XmlEventoBuilder xmlEventoBuilder;
   private final XmlSigner xmlSigner;
   private final XmlValidator xmlValidator;
 
@@ -60,6 +67,7 @@ public class NfseApiClient {
         .registerModule(new JavaTimeModule())
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     this.xmlBuilder = new XmlBuilder();
+    this.xmlEventoBuilder = new XmlEventoBuilder();
     this.xmlSigner = new XmlSigner();
     this.xmlValidator = new XmlValidator();
   }
@@ -198,15 +206,71 @@ public class NfseApiClient {
   /**
    * POST /nfse/{chaveAcesso}/eventos
    * Body: { "pedidoRegistroEventoXmlGZipB64": "..." }
-   *
-   * TODO: Implementar geração do XML de Pedido de Registro de Evento
-   *       conforme AnexoII-LeiautesRN_Eventos-SNNFSe do manual da RFB.
    */
-  public SituacaoNfse cancelar(String chaveAcesso, String motivo) {
-    throw new UnsupportedOperationException(
-        "Cancelamento via Evento ainda não implementado. " +
-            "Requer geração do XML do Pedido de Registro de Evento."
-    );
+  public ResultadoEvento cancelar(String chaveAcesso, PedidoEvento pedido) {
+    log.info("Cancelando NFS-e. Chave: {}", chaveAcesso);
+
+    try {
+      Document doc = xmlEventoBuilder.buildDocument(pedido);
+      String xmlAssinado = xmlSigner.assinarEvento(doc, config.getCertificado());
+      String gzipB64 = gzipBase64(xmlAssinado);
+
+      String url = config.getAmbiente().getEndpointEventos(chaveAcesso);
+      EventoRequest request = EventoRequest.builder()
+          .pedidoRegistroEventoXmlGZipB64(gzipB64)
+          .build();
+
+      String bodyJson = objectMapper.writeValueAsString(request);
+      log.info("POST {}", url);
+
+      HttpResponse<String> response = post(url, bodyJson);
+
+      log.info("HTTP Status: {}", response.statusCode());
+      log.info("Response body: {}", response.body());
+
+      if (response.statusCode() == 400 || response.statusCode() == 500) {
+        EventoResponse erro = objectMapper.readValue(response.body(), EventoResponse.class);
+        throw new NfseException("Evento rejeitado pela Sefin Nacional:\n" + erro.getErrosFormatados());
+      }
+
+      tratarErroHttp(response, "Cancelamento");
+
+      EventoResponse sucesso = objectMapper.readValue(response.body(), EventoResponse.class);
+      log.info("Evento registrado! Protocolo: {}", sucesso.getProtocolo());
+
+      return ResultadoEvento.builder()
+          .protocolo(sucesso.getProtocolo())
+          .chaveNfse(sucesso.getChNFSe() != null ? sucesso.getChNFSe() : chaveAcesso)
+          .cStat(sucesso.getCstat())
+          .xMotivo(sucesso.getXMotivo())
+          .sucesso(sucesso.isSuccess())
+          .build();
+
+    } catch (NfseException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new NfseException("Erro ao cancelar NFS-e.", e);
+    }
+  }
+
+  // ========================
+  // Substituição
+  // ========================
+
+  /**
+   * Substitui uma NFS-e enviando um DPS com referência à nota original.
+   */
+  public Nfse substituir(String chaveNfseOriginal, Dps novaDps) {
+    log.info("Substituindo NFS-e. Chave original: {}", chaveNfseOriginal);
+
+    Substituicao subst = (novaDps.getSubst() != null) ? novaDps.getSubst() :
+        Substituicao.builder()
+            .chSubstda(chaveNfseOriginal)
+            .cMotivo("99")
+            .build();
+
+    Dps dpsComSubst = novaDps.toBuilder().subst(subst).build();
+    return emitir(dpsComSubst);
   }
 
   // ========================

@@ -8,7 +8,10 @@ Biblioteca Java para comunicação com a **API Nacional de NFS-e** (Nota Fiscal 
 
 ## Funcionalidades
 
-- ✅ **Emissão de NFS-e** via DPS (Documento Particular de Serviço)
+- ✅ **Emissão de NFS-e** via DPS (Declaração de Prestação de Serviços)
+- ✅ **Cancelamento de NFS-e** via Pedido de Registro de Evento (XML assinado)
+- ✅ **Substituição de NFS-e** — emissão com referência à nota substituída
+- ✅ **DANFSe em PDF** — download do Documento Auxiliar da NFS-e
 - ✅ **Sincronização de DF-e** — busca NFS-e emitidas e recebidas pelo CNPJ
 - ✅ **Consulta de NFS-e** pela chave de acesso
 - ✅ **Autenticação mTLS** com certificado digital **A1** (`.pfx`) e **A3** (token/smartcard)
@@ -21,8 +24,9 @@ Biblioteca Java para comunicação com a **API Nacional de NFS-e** (Nota Fiscal 
 
 | API | URL | Função |
 |---|---|---|
-| **Sefin Nacional** | `sefin.producaorestrita.nfse.gov.br/SefinNacional` | Emissão de NFS-e |
+| **Sefin Nacional** | `sefin.producaorestrita.nfse.gov.br/SefinNacional` | Emissão, consulta, cancelamento, substituição |
 | **ADN Contribuintes** | `adn.nfse.gov.br/contribuintes` | Sincronização de DF-e |
+| **ADN DANFSe** | `adn.nfse.gov.br/danfse` | Download do DANFSe em PDF |
 
 ## Instalação
 
@@ -30,7 +34,7 @@ Biblioteca Java para comunicação com a **API Nacional de NFS-e** (Nota Fiscal 
 <dependency>
     <groupId>io.github.deivided</groupId>
     <artifactId>java-nfse</artifactId>
-    <version>1.0.4</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -100,6 +104,40 @@ Nfse nfse = client.emitir(dps);
 System.out.println("Chave: " + nfse.getChaveAcesso());
 ```
 
+### Cancelar NFS-e
+
+```java
+PedidoEvento pedido = PedidoEvento.builder()
+    .chaveNfse("50digitsChaveDeAcesso")
+    .cnpjAutor("00000000000191")
+    .cMotivo(MotivoCancelamento.ERRO_EMISSAO.getCodigo())
+    .xMotivo("Erro na emissão: dados incorretos do tomador.")
+    .build();
+
+ResultadoEvento resultado = client.cancelar(chaveAcesso, pedido);
+System.out.println("Protocolo: " + resultado.getProtocolo());
+System.out.println("Sucesso: " + resultado.isSucesso());
+```
+
+### Substituir NFS-e
+
+```java
+// Envia novo DPS referenciando a nota a ser substituída
+Dps novaDps = Dps.builder()
+    // ... mesmos dados do DPS original corrigidos
+    .build();
+
+Nfse novaNfse = client.substituir(chaveNfseOriginal, novaDps);
+System.out.println("Nova chave: " + novaNfse.getChaveAcesso());
+```
+
+### Obter DANFSe em PDF
+
+```java
+byte[] pdf = client.obterDanfse(chaveAcesso);
+Files.write(Path.of("danfse.pdf"), pdf);
+```
+
 ### Certificado A3 (token/smartcard)
 
 ```java
@@ -118,15 +156,18 @@ src/main/java/com/coffeetecnologia/nfse/
 │   ├── CertificadoDigital.java      # A1 e A3
 │   └── TokenManager.java
 ├── model/
-│   ├── dps/                         # DPS, Prestador, Tomador, Serviço, Valores
+│   ├── dps/                         # DPS, Prestador, Tomador, Serviço, Valores, Substituicao
+│   ├── evento/                      # PedidoEvento, ResultadoEvento, MotivoCancelamento
 │   └── nfse/                        # Nfse, SituacaoNfse
 ├── xml/
 │   ├── XmlBuilder.java              # Geração do XML DPS (XSD v1.01)
+│   ├── XmlEventoBuilder.java        # Geração do XML pedRegEvento
 │   ├── XmlSigner.java               # Assinatura XMLDSig RSA-SHA256
 │   └── XmlValidator.java            # Validação contra XSD
 ├── api/
-│   ├── NfseApiClient.java           # Sefin Nacional (emissão)
+│   ├── NfseApiClient.java           # Sefin Nacional (emissão, cancelamento, substituição)
 │   ├── DistribuicaoApiClient.java   # ADN Contribuintes (sincronização)
+│   ├── DanfseApiClient.java         # ADN DANFSe (PDF)
 │   ├── request/                     # DTOs de request
 │   └── response/                    # DTOs de response
 └── config/

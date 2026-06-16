@@ -2,6 +2,7 @@ package com.coffeetecnologia.nfse.xml;
 
 import com.coffeetecnologia.nfse.exception.NfseException;
 import com.coffeetecnologia.nfse.model.dps.*;
+import com.coffeetecnologia.nfse.model.dps.Substituicao;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -45,7 +46,7 @@ public class XmlBuilder {
 
   private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
   private static final String VERSAO = "1.01";
-  private static final String VER_APLIC = "java-nfse-1.0.0";
+  private static final String VER_APLIC = "java-nfse-1.1.0";
   private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
   private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -132,6 +133,11 @@ public class XmlBuilder {
     // Código IBGE do município emissor (7 dígitos)
     addEl(doc, el, "cLocEmi", dps.getCodigoMunicipio());
 
+    // Substituição (opcional) — deve vir antes de <prest> conforme XSD
+    if (dps.getSubst() != null) {
+      el.appendChild(buildSubst(doc, dps.getSubst()));
+    }
+
     // Prestador
     el.appendChild(buildPrest(doc, dps.getPrestador()));
 
@@ -146,6 +152,20 @@ public class XmlBuilder {
     // Valores
     el.appendChild(buildValores(doc, dps.getValores()));
 
+    return el;
+  }
+
+  // ========================
+  // <subst>
+  // ========================
+
+  private Element buildSubst(Document doc, Substituicao subst) {
+    Element el = doc.createElementNS(NS, "subst");
+    addEl(doc, el, "chSubstda", subst.getChSubstda());
+    addEl(doc, el, "cMotivo", subst.getCMotivo());
+    if (subst.getXMotivo() != null) {
+      addEl(doc, el, "xMotivo", subst.getXMotivo());
+    }
     return el;
   }
 

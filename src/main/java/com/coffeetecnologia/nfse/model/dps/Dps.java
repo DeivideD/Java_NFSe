@@ -29,7 +29,7 @@ import java.time.LocalDate;
  * }</pre>
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class Dps {
 
   /** Identificador único do DPS gerado pelo prestador. */
@@ -48,6 +48,9 @@ public class Dps {
 
   /** Número sequencial do DPS no prestador. */
   private final String numero;
+
+  /** Dados de substituição de NFS-e anterior (opcional). */
+  private final Substituicao subst;
 
   /** Dados do prestador de serviço (quem emite a nota). */
   private final Prestador prestador;

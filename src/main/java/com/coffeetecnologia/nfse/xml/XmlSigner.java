@@ -55,23 +55,15 @@ public class XmlSigner {
       PrivateKey privateKey = certificado.getPrivateKey();
       X509Certificate cert = certificado.getCertificado();
 
-      // Obtém o Id do elemento raiz para referência na assinatura
-      String id = resolverIdElementoRaiz(document);
+      String id = resolverId(document, "infDPS");
 
-      // 1. Define a referência ao elemento assinado (URI="#Id_do_DPS")
       Reference reference = criarReferencia(id);
-
-      // 2. Define o método de assinatura RSA-SHA256
       SignedInfo signedInfo = criarSignedInfo(reference);
-
-      // 3. Cria o KeyInfo com o certificado X.509 (obrigatório pela RFB)
       KeyInfo keyInfo = criarKeyInfo(cert);
 
-      // 4. Localiza onde inserir a assinatura no DOM
       Element elementoRaiz = document.getDocumentElement();
       DOMSignContext signContext = new DOMSignContext(privateKey, elementoRaiz);
 
-      // 5. Cria e executa a assinatura
       XMLSignature signature = signatureFactory.newXMLSignature(signedInfo, keyInfo);
       signature.sign(signContext);
 
@@ -81,6 +73,41 @@ public class XmlSigner {
       throw e;
     } catch (Exception e) {
       throw new AssinaturaException("Erro ao assinar o XML do DPS.", e);
+    }
+  }
+
+  /**
+   * Assina o Document DOM do evento (pedRegEvento) e retorna o XML assinado como String.
+   *
+   * @param document    documento DOM gerado pelo {@link XmlEventoBuilder}
+   * @param certificado certificado digital do prestador
+   * @return XML do evento com assinatura digital embutida
+   */
+  public String assinarEvento(Document document, CertificadoDigital certificado) {
+    try {
+      validarCertificado(certificado);
+
+      PrivateKey privateKey = certificado.getPrivateKey();
+      X509Certificate cert = certificado.getCertificado();
+
+      String id = resolverId(document, "infPedReg");
+
+      Reference reference = criarReferencia(id);
+      SignedInfo signedInfo = criarSignedInfo(reference);
+      KeyInfo keyInfo = criarKeyInfo(cert);
+
+      Element elementoRaiz = document.getDocumentElement();
+      DOMSignContext signContext = new DOMSignContext(privateKey, elementoRaiz);
+
+      XMLSignature signature = signatureFactory.newXMLSignature(signedInfo, keyInfo);
+      signature.sign(signContext);
+
+      return documentToString(document);
+
+    } catch (AssinaturaException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new AssinaturaException("Erro ao assinar o XML do evento.", e);
     }
   }
 
@@ -139,30 +166,28 @@ public class XmlSigner {
   // Utilitários
   // ========================
 
-  private String resolverIdElementoRaiz(Document document) {
-    // O Id fica em <infDPS>, filho do elemento raiz <DPS>
+  private String resolverId(Document document, String elementName) {
     NodeList nodes = document.getElementsByTagNameNS(
-        "http://www.sped.fazenda.gov.br/nfse", "infDPS"
+        "http://www.sped.fazenda.gov.br/nfse", elementName
     );
 
     if (nodes.getLength() == 0) {
       throw new AssinaturaException(
-          "Elemento <infDPS> não encontrado no XML do DPS."
+          "Elemento <" + elementName + "> não encontrado no XML."
       );
     }
 
-    Element infDps = (Element) nodes.item(0);
-    String id = infDps.getAttribute("Id");
+    Element element = (Element) nodes.item(0);
+    String id = element.getAttribute("Id");
 
     if (id == null || id.isBlank()) {
       throw new AssinaturaException(
-          "Elemento <infDPS> não possui atributo 'Id'. " +
+          "Elemento <" + elementName + "> não possui atributo 'Id'. " +
               "A assinatura XMLDSig requer um Id para referenciar o elemento assinado."
       );
     }
 
-    // Registra como tipo ID para o XMLDSig resolver a referência URI="#DPS..."
-    infDps.setIdAttribute("Id", true);
+    element.setIdAttribute("Id", true);
     return id;
   }
 

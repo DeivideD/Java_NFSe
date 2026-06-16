@@ -1,5 +1,6 @@
 package com.coffeetecnologia.nfse;
 
+import com.coffeetecnologia.nfse.api.DanfseApiClient;
 import com.coffeetecnologia.nfse.api.DistribuicaoApiClient;
 import com.coffeetecnologia.nfse.api.NfseApiClient;
 import com.coffeetecnologia.nfse.api.response.DfeResponse;
@@ -8,8 +9,9 @@ import com.coffeetecnologia.nfse.config.Ambiente;
 import com.coffeetecnologia.nfse.config.NfseConfig;
 import com.coffeetecnologia.nfse.exception.NfseException;
 import com.coffeetecnologia.nfse.model.dps.Dps;
+import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
+import com.coffeetecnologia.nfse.model.evento.ResultadoEvento;
 import com.coffeetecnologia.nfse.model.nfse.Nfse;
-import com.coffeetecnologia.nfse.model.nfse.SituacaoNfse;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -42,6 +44,7 @@ public class NfseClient {
   private final NfseConfig config;
   private final NfseApiClient apiClient;
   private final DistribuicaoApiClient distribuicaoClient;
+  private final DanfseApiClient danfseClient;
 
   private NfseClient(NfseConfig config) {
     this.config = config;
@@ -50,6 +53,7 @@ public class NfseClient {
     HttpClient httpClient = criarHttpClient(config);
     this.apiClient = new NfseApiClient(config, httpClient);
     this.distribuicaoClient = new DistribuicaoApiClient(config, httpClient);
+    this.danfseClient = new DanfseApiClient(config, httpClient);
   }
 
   // ========================
@@ -75,9 +79,19 @@ public class NfseClient {
     return apiClient.consultarChavePorDps(idDps);
   }
 
-  /** Cancela uma NFS-e. POST /SefinNacional/nfse/{chaveAcesso}/eventos */
-  public SituacaoNfse cancelar(String chaveAcesso, String motivo) {
-    return apiClient.cancelar(chaveAcesso, motivo);
+  /** Cancela uma NFS-e via evento. POST /nfse/{chaveAcesso}/eventos */
+  public ResultadoEvento cancelar(String chaveAcesso, PedidoEvento pedido) {
+    return apiClient.cancelar(chaveAcesso, pedido);
+  }
+
+  /** Substitui uma NFS-e. Envia DPS com subst referenciando a nota original. */
+  public Nfse substituir(String chaveNfseOriginal, Dps novaDps) {
+    return apiClient.substituir(chaveNfseOriginal, novaDps);
+  }
+
+  /** Obtém o DANFSe (Documento Auxiliar da NFS-e) em PDF pela chave de acesso. */
+  public byte[] obterDanfse(String chaveAcesso) {
+    return danfseClient.obterDanfse(chaveAcesso);
   }
 
   // ========================
