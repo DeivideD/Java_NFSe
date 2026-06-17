@@ -12,8 +12,8 @@ public class EmitirNfseManualTest {
   public static void main(String[] args) {
 
     // ← Preencha antes de rodar
-    String caminho = "CAMINHO_SEU_CERTIFICADO";
-    String senha   = "SEUA_SENHA";
+    String caminho = "/home/deivide/Downloads/certificado/coffee.pfx";
+    String senha   = "123456";
 
     System.out.println("=== Emitindo NFS-e em Produção Restrita ===\n");
 
@@ -29,7 +29,7 @@ public class EmitirNfseManualTest {
           .numero("1")
           .serie("1")
           .prestador(Prestador.builder()
-              .cnpj("44372492000111")
+              .cnpj("42742743000187")
               .codigoMunicipio("2304400")
               .build())
           .tomador(Tomador.builder()
@@ -37,8 +37,8 @@ public class EmitirNfseManualTest {
               .nome("SOWAL COMERCIO E SERVICOS LTDA")
               .build())
           .servico(Servico.builder()
-              .codigoServico("010601")
-              .descricao("Consultoria em tecnologia da informação")
+              .codigoServico("010101")
+              .descricao("Análise e desenvolvimento de sistemas")
               .build())
           .valores(Valores.builder()
               .valorServico(new BigDecimal("100.00"))

@@ -59,6 +59,11 @@ public enum Ambiente {
     return baseUrl + "/nfse/" + chaveAcesso + "/eventos";
   }
 
+  /** GET /parametros-municipais/{cMun}/convenio — parâmetros e serviços habilitados no município */
+  public String getEndpointParametrosMunicipais(String codigoMunicipio) {
+    return baseUrl + "/parametros-municipais/" + codigoMunicipio + "/convenio";
+  }
+
   public boolean isHomologacao() {
     return this == PRODUCAO_RESTRITA;
   }

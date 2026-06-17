@@ -94,6 +94,15 @@ public class NfseClient {
     return danfseClient.obterDanfse(chaveAcesso);
   }
 
+  /**
+   * Consulta parâmetros e serviços habilitados para um município.
+   * GET /SefinNacional/parametros-municipais/{codigoMunicipio}/convenio
+   * Retorna JSON bruto da API.
+   */
+  public String consultarParametrosMunicipais(String codigoMunicipio) {
+    return apiClient.consultarParametrosMunicipais(codigoMunicipio);
+  }
+
   // ========================
   // Distribuição / Sincronização
   // ========================

@@ -274,6 +274,22 @@ public class NfseApiClient {
   }
 
   // ========================
+  // Parâmetros Municipais
+  // ========================
+
+  /**
+   * GET /parametros-municipais/{codigoMunicipio}/convenio
+   * Retorna JSON com serviços habilitados e parâmetros do município.
+   */
+  public String consultarParametrosMunicipais(String codigoMunicipio) {
+    log.info("Consultando parâmetros municipais. Município: {}", codigoMunicipio);
+    String url = config.getAmbiente().getEndpointParametrosMunicipais(codigoMunicipio);
+    HttpResponse<String> response = get(url);
+    tratarErroHttp(response, "Consulta parâmetros municipais");
+    return response.body();
+  }
+
+  // ========================
   // HTTP
   // ========================
 
