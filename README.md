@@ -34,7 +34,7 @@ Biblioteca Java para comunicação com a **API Nacional de NFS-e** (Nota Fiscal 
 <dependency>
     <groupId>io.github.deivided</groupId>
     <artifactId>java-nfse</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
