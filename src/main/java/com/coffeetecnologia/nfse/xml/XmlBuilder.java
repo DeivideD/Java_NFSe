@@ -1,7 +1,15 @@
 package com.coffeetecnologia.nfse.xml;
 
 import com.coffeetecnologia.nfse.exception.NfseException;
-import com.coffeetecnologia.nfse.model.dps.*;
+import com.coffeetecnologia.nfse.model.dps.Dest;
+import com.coffeetecnologia.nfse.model.dps.Dps;
+import com.coffeetecnologia.nfse.model.dps.GIbscbs;
+import com.coffeetecnologia.nfse.model.dps.Ibscbs;
+import com.coffeetecnologia.nfse.model.dps.Prestador;
+import com.coffeetecnologia.nfse.model.dps.Servico;
+import com.coffeetecnologia.nfse.model.dps.Substituicao;
+import com.coffeetecnologia.nfse.model.dps.Tomador;
+import com.coffeetecnologia.nfse.model.dps.Valores;
 import com.coffeetecnologia.nfse.model.dps.Substituicao;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -46,7 +54,7 @@ public class XmlBuilder {
 
   private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
   private static final String VERSAO = "1.01";
-  private static final String VER_APLIC = "java-nfse-1.1.0";
+  private static final String VER_APLIC = "java-nfse-1.2.0";
   private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
   private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -81,7 +89,7 @@ public class XmlBuilder {
       Element root = buildDps(doc, dps);
       doc.appendChild(root);
       return doc;
-    } catch (NfseException e) {
+    } catch (NfseException | IllegalStateException e) {
       throw e;
     } catch (Exception e) {
       throw new NfseException("Erro ao gerar Document do DPS.", e);
@@ -151,6 +159,11 @@ public class XmlBuilder {
 
     // Valores
     el.appendChild(buildValores(doc, dps.getValores()));
+
+    // IBSCBS — último elemento de infDPS conforme TCInfDPS (XSD v1.01, jul/2026)
+    if (dps.getIbscbs() != null) {
+      el.appendChild(buildIbscbs(doc, dps.getIbscbs()));
+    }
 
     return el;
   }
@@ -344,6 +357,67 @@ public class XmlBuilder {
     } catch (Exception e) {
       throw new NfseException("Erro ao serializar XML.", e);
     }
+  }
+
+  // ========================
+  // <IBSCBS>
+  // ========================
+
+  private Element buildIbscbs(Document doc, Ibscbs ibscbs) {
+    if (ibscbs.getGIbscbs() == null) {
+      throw new IllegalStateException("IBSCBS.gIbscbs é obrigatório quando o grupo IBSCBS é informado.");
+    }
+    if (ibscbs.getCIndOp() == null || ibscbs.getCIndOp().isBlank()) {
+      throw new IllegalStateException("IBSCBS.cIndOp é obrigatório quando o grupo IBSCBS é informado.");
+    }
+    if (ibscbs.getIndDest() == null || ibscbs.getIndDest().isBlank()) {
+      throw new IllegalStateException("IBSCBS.indDest é obrigatório quando o grupo IBSCBS é informado.");
+    }
+    if ("1".equals(ibscbs.getIndDest()) && ibscbs.getDest() == null) {
+      throw new IllegalStateException("IBSCBS.dest é obrigatório quando indDest=\"1\".");
+    }
+
+    Element el = doc.createElementNS(NS, "IBSCBS");
+
+    addEl(doc, el, "finNFSe", ibscbs.getFinNFSe());
+    addEl(doc, el, "cIndOp", ibscbs.getCIndOp());
+    addEl(doc, el, "indDest", ibscbs.getIndDest());
+
+    if (ibscbs.getDest() != null) {
+      el.appendChild(buildDest(doc, ibscbs.getDest()));
+    }
+
+    // <valores><trib><gIBSCBS>
+    GIbscbs g = ibscbs.getGIbscbs();
+    Element valores = doc.createElementNS(NS, "valores");
+    Element trib = doc.createElementNS(NS, "trib");
+    Element gIBSCBS = doc.createElementNS(NS, "gIBSCBS");
+    addEl(doc, gIBSCBS, "CST", g.getCst());
+    addEl(doc, gIBSCBS, "cClassTrib", g.getCClassTrib());
+    trib.appendChild(gIBSCBS);
+    valores.appendChild(trib);
+    el.appendChild(valores);
+
+    return el;
+  }
+
+  private Element buildDest(Document doc, Dest dest) {
+    Element el = doc.createElementNS(NS, "dest");
+
+    if (dest.getCnpj() != null) {
+      addEl(doc, el, "CNPJ", dest.getCnpj());
+    } else if (dest.getCpf() != null) {
+      addEl(doc, el, "CPF", dest.getCpf());
+    } else if (dest.getNif() != null) {
+      addEl(doc, el, "NIF", dest.getNif());
+    } else if (dest.getCNaoNIF() != null) {
+      addEl(doc, el, "cNaoNIF", dest.getCNaoNIF());
+    } else {
+      throw new IllegalStateException("dest requer exatamente um de: CNPJ, CPF, NIF ou cNaoNIF.");
+    }
+
+    addEl(doc, el, "xNome", dest.getXNome());
+    return el;
   }
 
   private Element buildObra(Document doc, Servico.Obra obra, String codigoMunicipio) {

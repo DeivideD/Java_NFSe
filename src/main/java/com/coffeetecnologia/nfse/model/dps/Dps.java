@@ -72,6 +72,13 @@ public class Dps {
   private final NaturezaOperacao naturezaOperacao = NaturezaOperacao.TRIBUTACAO_MUNICIPIO;
 
   /**
+   * Informações declaradas pelo emitente referentes ao IBS e à CBS (opcional).
+   * Quando informado, é emitido como último elemento de infDPS, após {@code <valores>}.
+   * Validação de exigibilidade pelo Ambiente Nacional suspensa em 2026 (NT 004 v2.0).
+   */
+  private final Ibscbs ibscbs;
+
+  /**
    * Natureza da operação da NFS-e conforme padrão nacional.
    */
   public enum NaturezaOperacao {
