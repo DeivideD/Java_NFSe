@@ -5,7 +5,6 @@ import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -79,8 +78,7 @@ public class XmlEventoBuilder {
   public String toXmlString(Document doc) {
     try {
       TransformerFactory tf = TransformerFactory.newInstance();
-      tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-      tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+      XmlBuilder.hardenTransformerFactory(tf);
 
       Transformer t = tf.newTransformer();
       t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");

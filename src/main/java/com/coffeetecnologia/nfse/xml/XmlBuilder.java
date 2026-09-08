@@ -343,8 +343,7 @@ public class XmlBuilder {
   public String toXmlString(Document doc) {
     try {
       TransformerFactory tf = TransformerFactory.newInstance();
-      tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-      tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+      hardenTransformerFactory(tf);
 
       Transformer t = tf.newTransformer();
       t.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
@@ -356,6 +355,21 @@ public class XmlBuilder {
       return sw.toString();
     } catch (Exception e) {
       throw new NfseException("Erro ao serializar XML.", e);
+    }
+  }
+
+  /**
+   * Aplica hardening XXE (ACCESS_EXTERNAL_DTD / ACCESS_EXTERNAL_STYLESHEET) na
+   * TransformerFactory, tolerando implementações pré-JAXP 1.5 (ex.: Apache Xalan
+   * 2.7.x no classpath da aplicação) que lançam IllegalArgumentException nesses
+   * atributos. Nesse caso o hardening é best-effort e a serialização segue.
+   */
+  static void hardenTransformerFactory(TransformerFactory tf) {
+    try {
+      tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+      tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+    } catch (IllegalArgumentException ignored) {
+      // TransformerFactory sem suporte a JAXP 1.5 — segue sem os atributos.
     }
   }
 

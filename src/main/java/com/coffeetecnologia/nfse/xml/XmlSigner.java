@@ -203,8 +203,7 @@ public class XmlSigner {
   private String documentToString(Document document) {
     try {
       TransformerFactory tf = TransformerFactory.newInstance();
-      tf.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
-      tf.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+      XmlBuilder.hardenTransformerFactory(tf);
 
       Transformer transformer = tf.newTransformer();
       transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
