@@ -54,10 +54,12 @@ public class XmlBuilder {
 
   private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
   private static final String VERSAO = "1.01";
-  private static final String VER_APLIC = "java-nfse-1.2.3";
+  private static final String VER_APLIC = "java-nfse-1.2.4";
   private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
   private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+  /** Recuo aplicado a {@code <dhEmi>} para não estourar E0008 por diferença de relógio com a Sefin. */
+  private static final java.time.Duration MARGEM_DH_EMI = java.time.Duration.ofMinutes(5);
 
   private final DocumentBuilder documentBuilder;
   private final int tpAmb;
@@ -132,7 +134,12 @@ public class XmlBuilder {
     addEl(doc, el, "tpAmb", String.valueOf(tpAmb));
 
     // Data/hora com timezone: yyyy-MM-dd'T'HH:mm:ssxxx
-    ZonedDateTime agora = ZonedDateTime.now(ZONE_BR);
+    // Recuo de MARGEM_DH_EMI: a Sefin rejeita com E0008 qualquer dhEmi à frente do
+    // relógio dela no momento do processamento. O ambiente de Produção Restrita
+    // costuma estar alguns minutos atrás do horário oficial; o recuo absorve essa
+    // diferença e a latência de assinatura/transmissão sem violar nenhuma regra
+    // (dhEmi só não pode ser futuro; não há limite inferior no mesmo dia).
+    ZonedDateTime agora = ZonedDateTime.now(ZONE_BR).minus(MARGEM_DH_EMI);
     addEl(doc, el, "dhEmi", agora.format(FMT_DATETIME));
 
     addEl(doc, el, "verAplic", VER_APLIC);
