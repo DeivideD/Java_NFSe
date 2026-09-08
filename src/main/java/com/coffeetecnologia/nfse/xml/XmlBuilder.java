@@ -54,7 +54,7 @@ public class XmlBuilder {
 
   private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
   private static final String VERSAO = "1.01";
-  private static final String VER_APLIC = "java-nfse-1.2.2";
+  private static final String VER_APLIC = "java-nfse-1.2.3";
   private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
   private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -246,6 +246,49 @@ public class XmlBuilder {
       addEl(doc, el, "xNome", "Não Informado");
     }
 
+    // <end> — exigido pela Sefin Nacional quando o ISSQN é devido no município do
+    // tomador (itens LC 01.xx etc.) ou pelo indicador de operação (rejeição E0234).
+    // Só é emitido com o endereço completo; um <end> parcial reprova no XSD (E1235).
+    Element end = buildEndTomador(doc, tomador.getEndereco());
+    if (end != null) {
+      el.appendChild(end);
+    }
+
+    addEl(doc, el, "email", tomador.getEmail());
+
+    return el;
+  }
+
+  // ========================
+  // <toma><end> — endereço do tomador (TCEndereco / endNac)
+  // ========================
+
+  private Element buildEndTomador(Document doc, Tomador.Endereco endereco) {
+    if (endereco == null) return null;
+
+    String cMun = soDigitos(endereco.getCodigoMunicipio());
+    String cep = soDigitos(endereco.getCep());
+    String xLgr = trimToNull(endereco.getLogradouro());
+    String nro = trimToNull(endereco.getNumero());
+    String xBairro = trimToNull(endereco.getBairro());
+
+    // TCEndereco + endNac: cMun(7), CEP(8), xLgr, nro e xBairro são obrigatórios.
+    if (cMun.length() != 7 || cep.length() != 8 || xLgr == null || nro == null || xBairro == null) {
+      return null;
+    }
+
+    Element el = doc.createElementNS(NS, "end");
+
+    Element endNac = doc.createElementNS(NS, "endNac");
+    addEl(doc, endNac, "cMun", cMun);
+    addEl(doc, endNac, "CEP", cep);
+    el.appendChild(endNac);
+
+    addEl(doc, el, "xLgr", xLgr);
+    addEl(doc, el, "nro", nro);
+    addEl(doc, el, "xCpl", trimToNull(endereco.getComplemento()));
+    addEl(doc, el, "xBairro", xBairro);
+
     return el;
   }
 
@@ -349,6 +392,16 @@ public class XmlBuilder {
   private String fmt(BigDecimal value) {
     if (value == null) return "0.00";
     return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
+  }
+
+  private static String soDigitos(String v) {
+    return v == null ? "" : v.replaceAll("[^0-9]", "");
+  }
+
+  private static String trimToNull(String v) {
+    if (v == null) return null;
+    String t = v.trim();
+    return t.isEmpty() ? null : t;
   }
 
   public String toXmlString(Document doc) {
