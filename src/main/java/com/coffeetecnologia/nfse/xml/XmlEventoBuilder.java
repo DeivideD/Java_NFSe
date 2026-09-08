@@ -47,8 +47,18 @@ public class XmlEventoBuilder {
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
 
   private final DocumentBuilder documentBuilder;
+  private final int tpAmb;
 
+  /** Compatibilidade: assume Produção Restrita (tpAmb=2). */
   public XmlEventoBuilder() {
+    this(2);
+  }
+
+  /**
+   * @param tpAmb código do ambiente gravado em {@code <tpAmb>}: 1=Produção, 2=Produção Restrita.
+   */
+  public XmlEventoBuilder(int tpAmb) {
+    this.tpAmb = tpAmb;
     try {
       DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
       factory.setNamespaceAware(true);
@@ -112,7 +122,7 @@ public class XmlEventoBuilder {
     Element el = doc.createElementNS(NS, "infPedReg");
     el.setAttribute("Id", gerarId(pedido));
 
-    addEl(doc, el, "tpAmb", "2");
+    addEl(doc, el, "tpAmb", String.valueOf(tpAmb));
     addEl(doc, el, "verAplic", VER_APLIC);
 
     ZonedDateTime agora = ZonedDateTime.now(ZONE_BR);

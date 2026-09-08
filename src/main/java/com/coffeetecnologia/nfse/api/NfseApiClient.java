@@ -66,8 +66,9 @@ public class NfseApiClient {
     this.objectMapper = new ObjectMapper()
         .registerModule(new JavaTimeModule())
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    this.xmlBuilder = new XmlBuilder();
-    this.xmlEventoBuilder = new XmlEventoBuilder();
+    int tpAmb = config.getAmbiente().getTpAmb();
+    this.xmlBuilder = new XmlBuilder(tpAmb);
+    this.xmlEventoBuilder = new XmlEventoBuilder(tpAmb);
     this.xmlSigner = new XmlSigner();
     this.xmlValidator = new XmlValidator();
   }

@@ -54,14 +54,25 @@ public class XmlBuilder {
 
   private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
   private static final String VERSAO = "1.01";
-  private static final String VER_APLIC = "java-nfse-1.2.0";
+  private static final String VER_APLIC = "java-nfse-1.2.2";
   private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
   private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
   private final DocumentBuilder documentBuilder;
+  private final int tpAmb;
 
+  /** Compatibilidade: assume Produção Restrita (tpAmb=2). */
   public XmlBuilder() {
+    this(2);
+  }
+
+  /**
+   * @param tpAmb código do ambiente gravado em {@code <tpAmb>}: 1=Produção, 2=Produção Restrita.
+   *              Deve bater com o endpoint para o qual a DPS é enviada (senão a Sefin devolve E0006).
+   */
+  public XmlBuilder(int tpAmb) {
+    this.tpAmb = tpAmb;
     try {
       DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
       factory.setNamespaceAware(true);
@@ -117,8 +128,8 @@ public class XmlBuilder {
     String id = gerarId(dps);
     el.setAttribute("Id", id);
 
-    // Ambiente: 1=Produção, 2=Homologação
-    addEl(doc, el, "tpAmb", "2");
+    // Ambiente: 1=Produção, 2=Produção Restrita — derivado do Ambiente configurado
+    addEl(doc, el, "tpAmb", String.valueOf(tpAmb));
 
     // Data/hora com timezone: yyyy-MM-dd'T'HH:mm:ssxxx
     ZonedDateTime agora = ZonedDateTime.now(ZONE_BR);
