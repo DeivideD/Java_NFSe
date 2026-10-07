@@ -5,6 +5,7 @@ import com.coffeetecnologia.nfse.api.DistribuicaoApiClient;
 import com.coffeetecnologia.nfse.api.NfseApiClient;
 import com.coffeetecnologia.nfse.api.response.DfeResponse;
 import com.coffeetecnologia.nfse.auth.CertificadoDigital;
+import com.coffeetecnologia.nfse.auth.ClientCertificateKeyManager;
 import com.coffeetecnologia.nfse.config.Ambiente;
 import com.coffeetecnologia.nfse.config.NfseConfig;
 import com.coffeetecnologia.nfse.exception.NfseException;
@@ -13,7 +14,7 @@ import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
 import com.coffeetecnologia.nfse.model.evento.ResultadoEvento;
 import com.coffeetecnologia.nfse.model.nfse.Nfse;
 
-import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import java.net.http.HttpClient;
 import java.security.KeyStore;
@@ -192,13 +193,12 @@ public class NfseClient {
       KeyStore keyStore = config.getCertificado().getKeyStore();
       char[] senha = config.getCertificado().getSenha();
 
-      KeyManagerFactory kmf = KeyManagerFactory.getInstance(
-          KeyManagerFactory.getDefaultAlgorithm()
-      );
-      kmf.init(keyStore, senha);
+      // Sempre apresenta o certificado da empresa, mesmo que o PFX não traga a cadeia até as raízes
+      // ICP-Brasil que o ADN lista no CertificateRequest (ver ClientCertificateKeyManager).
+      KeyManager[] keyManagers = {ClientCertificateKeyManager.of(keyStore, senha)};
 
       SSLContext sslContext = SSLContext.getInstance("TLS");
-      sslContext.init(kmf.getKeyManagers(), null, null);
+      sslContext.init(keyManagers, null, null);
 
       return HttpClient.newBuilder()
           .sslContext(sslContext)

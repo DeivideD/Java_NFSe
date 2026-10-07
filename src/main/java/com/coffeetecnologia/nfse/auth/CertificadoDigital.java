@@ -148,13 +148,19 @@ public class CertificadoDigital {
   }
 
   /**
-   * Resolve o primeiro alias disponível no KeyStore.
+   * Resolve o alias da entrada com chave privada — é ela que assina e que o mTLS apresenta. O primeiro
+   * alias do PFX pode ser só um certificado da cadeia (ex.: a AC intermediária); nesse caso a assinatura
+   * usaria a entrada errada. Sem nenhuma entrada de chave, mantém o comportamento anterior (primeiro alias).
    */
   private static String resolverAlias(KeyStore keyStore) throws KeyStoreException {
+    String primeiro = null;
     Enumeration<String> aliases = keyStore.aliases();
-    if (aliases.hasMoreElements()) {
-      return aliases.nextElement();
+    while (aliases.hasMoreElements()) {
+      String alias = aliases.nextElement();
+      if (keyStore.isKeyEntry(alias)) return alias;
+      if (primeiro == null) primeiro = alias;
     }
+    if (primeiro != null) return primeiro;
     throw new CertificadoException("Nenhum alias encontrado no certificado.");
   }
 }
