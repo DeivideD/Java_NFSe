@@ -78,6 +78,18 @@ class DpsCamposFiscaisTest {
     assertThrows(NfseException.class, () -> xmlBuilder.build(dps().prestador(prestador).build()));
   }
 
+  @Test
+  @DisplayName("ME/EPP informa pTotTribSN no lugar do indTotTrib")
+  void totalTributosSimples() throws Exception {
+    Valores valores = Valores.builder().valorServico(new BigDecimal("1500.00"))
+        .percentualTributosSimplesNacional(new BigDecimal("6")).build();
+    Document doc = xmlBuilder.buildDocument(dps().valores(valores).build());
+
+    assertEquals("6.00", texto(doc, "pTotTribSN"));
+    assertNull(texto(doc, "indTotTrib"));
+    validarNosDoisLeiautes(doc);
+  }
+
   // --- datas ---------------------------------------------------------------------------------
 
   @Test

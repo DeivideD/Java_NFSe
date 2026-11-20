@@ -404,10 +404,14 @@ public class XmlBuilder {
     }
     trib.appendChild(tribMun);
 
-    // <totTrib> — total aproximado de tributos (obrigatório)
+    // <totTrib> — total aproximado de tributos (obrigatório). ME/EPP informa pTotTribSN (o indTotTrib
+    // é recusado com E0712); os demais, indTotTrib = 0 ("não informar valor estimado").
     Element totTrib = doc.createElementNS(NS, "totTrib");
-    // indTotTrib = 0 significa "não informar valor estimado"
-    addEl(doc, totTrib, "indTotTrib", "0");
+    if (valores.getPercentualTributosSimplesNacional() != null) {
+      addEl(doc, totTrib, "pTotTribSN", fmt(valores.getPercentualTributosSimplesNacional()));
+    } else {
+      addEl(doc, totTrib, "indTotTrib", "0");
+    }
     trib.appendChild(totTrib);
 
     el.appendChild(trib);
