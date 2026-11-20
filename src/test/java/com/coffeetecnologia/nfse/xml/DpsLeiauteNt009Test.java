@@ -41,7 +41,7 @@ class DpsLeiauteNt009Test {
     assertEquals(filhos.indexOf("tpEmit") + 1, filhos.indexOf("finNFSe"));
     assertEquals(filhos.indexOf("finNFSe") + 1, filhos.indexOf("cLocEmi"));
     assertEquals("0", doc.getElementsByTagNameNS(NS, "finNFSe").item(0).getTextContent());
-    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "xsd/nt009/DPS_v1.01.xsd");
+    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "schemas/nt009/DPS_v1.01.xsd");
   }
 
   @Test
@@ -51,7 +51,7 @@ class DpsLeiauteNt009Test {
     Document doc = nt009.buildDocument(dps().servico(servico).build());
 
     assertEquals(List.of("cTribNac", "cNBS", "xDescServ"), filhos(doc.getElementsByTagNameNS(NS, "cServ").item(0)));
-    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "xsd/nt009/DPS_v1.01.xsd");
+    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "schemas/nt009/DPS_v1.01.xsd");
   }
 
   @Test
@@ -64,7 +64,7 @@ class DpsLeiauteNt009Test {
     assertEquals(0, ibscbs.getElementsByTagNameNS(NS, "gIBSCBS").getLength());
     Node trib = ibscbs.getElementsByTagNameNS(NS, "trib").item(0);
     assertEquals(List.of("CST", "cClassTrib"), filhos(trib));
-    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "xsd/nt009/DPS_v1.01.xsd");
+    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "schemas/nt009/DPS_v1.01.xsd");
   }
 
   @Test
@@ -74,7 +74,7 @@ class DpsLeiauteNt009Test {
         .gIbscbs(GIbscbs.builder().cst("000").cClassTrib("000001").build()).build();
 
     String xml = nt009.build(dps().ibscbs(semIndOp).build());
-    DpsCamposFiscaisTest.validarContraXsd(xml, "xsd/nt009/DPS_v1.01.xsd");
+    DpsCamposFiscaisTest.validarContraXsd(xml, "schemas/nt009/DPS_v1.01.xsd");
   }
 
   @Test
@@ -84,7 +84,7 @@ class DpsLeiauteNt009Test {
     String xml = nt004.build(dps().servico(servico).ibscbs(ibscbs()).build());
 
     assertFalse(xml.contains("<finNFSe>0</finNFSe><cLocEmi>"));
-    DpsCamposFiscaisTest.validarContraXsd(xml, "xsd/DPS_v1.01.xsd");
+    DpsCamposFiscaisTest.validarContraXsd(xml, "schemas/nt004/DPS_v1.01.xsd");
   }
 
   private static Dps.DpsBuilder dps() {

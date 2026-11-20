@@ -344,7 +344,7 @@ class IbscbsXmlBuilderTest {
   // ========================
 
   private void validarContraXsd(String xml) throws SAXException, java.io.IOException {
-    URL xsdUrl = getClass().getClassLoader().getResource("xsd/DPS_v1.01.xsd");
+    URL xsdUrl = getClass().getClassLoader().getResource("schemas/nt004/DPS_v1.01.xsd");
     assertNotNull(xsdUrl, "XSD DPS_v1.01.xsd deve estar em src/test/resources/xsd/");
 
     SchemaFactory sf = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);

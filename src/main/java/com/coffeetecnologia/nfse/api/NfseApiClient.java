@@ -5,7 +5,11 @@ import com.coffeetecnologia.nfse.api.request.NfsePostRequest;
 import com.coffeetecnologia.nfse.api.response.EventoResponse;
 import com.coffeetecnologia.nfse.api.response.NfsePostResponse;
 import com.coffeetecnologia.nfse.config.NfseConfig;
+import com.coffeetecnologia.nfse.config.Leiaute;
+import com.coffeetecnologia.nfse.exception.NfseComunicacaoException;
 import com.coffeetecnologia.nfse.exception.NfseException;
+import com.coffeetecnologia.nfse.exception.NfseRejeitadaException;
+import com.coffeetecnologia.nfse.model.dps.DpsMontada;
 import com.coffeetecnologia.nfse.model.dps.Dps;
 import com.coffeetecnologia.nfse.model.dps.Substituicao;
 import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
@@ -40,6 +44,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -110,7 +115,7 @@ public class NfseApiClient {
 
     // 2. Valida contra XSD (opcional)
     if (config.isValidarXml()) {
-      xmlValidator.validarOuLancar(xmlBuilder.toXmlString(documento));
+      xmlValidator.validarOuLancar(xmlBuilder.toXmlString(documento), xmlBuilder.leiaute());
     }
 
     // 3. Assina
@@ -145,11 +150,13 @@ public class NfseApiClient {
     if (response.statusCode() == 400 || response.statusCode() >= 500) {
       NfsePostResponse erro = lerOuNull(response.body());
       if (erro != null && erro.getErros() != null && !erro.getErros().isEmpty()) {
-        throw new NfseException("DPS rejeitada pela Sefin Nacional:\n" + erro.getErrosFormatados());
+        throw new NfseRejeitadaException("DPS rejeitada pela Sefin Nacional:\n" + erro.getErrosFormatados(),
+            rejeicoes(erro.getErros()));
       }
       if (response.statusCode() >= 500) {
         Optional<Nfse> recuperada = recuperarPorDps(idDps);
         if (recuperada.isPresent()) return recuperada.get();
+        throw new NfseComunicacaoException("Emissão — HTTP " + response.statusCode() + " sem resposta da Sefin.");
       }
     }
     tratarErroHttp(response, "Emissão");
@@ -165,6 +172,17 @@ public class NfseApiClient {
     } catch (Exception e) {
       throw new NfseException("Erro ao emitir NFS-e.", e);
     }
+  }
+
+  /**
+   * Monta o DPS como a emissão montaria e valida contra o XSD do leiaute vigente, sem assinar e sem
+   * enviar nada à Sefin.
+   */
+  public DpsMontada montarDps(Dps dps) {
+    Document documento = xmlBuilder.buildDocument(dps);
+    Leiaute leiaute = xmlBuilder.leiaute();
+    String xml = xmlBuilder.toXmlString(documento);
+    return new DpsMontada(idDps(documento), xml, leiaute, xmlValidator.validarDps(xml, leiaute));
   }
 
   /**
@@ -262,7 +280,8 @@ public class NfseApiClient {
 
       if (response.statusCode() == 400 || response.statusCode() == 500) {
         EventoResponse erro = objectMapper.readValue(response.body(), EventoResponse.class);
-        throw new NfseException("Evento rejeitado pela Sefin Nacional:\n" + erro.getErrosFormatados());
+        throw new NfseRejeitadaException("Evento rejeitado pela Sefin Nacional:\n" + erro.getErrosFormatados(),
+            rejeicoes(erro.getErros()));
       }
 
       tratarErroHttp(response, "Cancelamento");
@@ -336,7 +355,7 @@ public class NfseApiClient {
           .build();
       return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     } catch (Exception e) {
-      throw new NfseException("Erro de comunicação com a Sefin Nacional (POST): " + url, e);
+      throw new NfseComunicacaoException("Erro de comunicação com a Sefin Nacional (POST): " + url, e);
     }
   }
 
@@ -350,7 +369,7 @@ public class NfseApiClient {
           .build();
       return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     } catch (Exception e) {
-      throw new NfseException("Erro de comunicação com a Sefin Nacional (GET): " + url, e);
+      throw new NfseComunicacaoException("Erro de comunicação com a Sefin Nacional (GET): " + url, e);
     }
   }
 
@@ -414,6 +433,13 @@ public class NfseApiClient {
     if (nodes.getLength() == 0) return null;
     String texto = nodes.item(0).getTextContent();
     return texto == null || texto.isBlank() ? null : texto.trim();
+  }
+
+  private static List<NfseRejeitadaException.Rejeicao> rejeicoes(List<NfsePostResponse.MensagemProcessamento> erros) {
+    if (erros == null) return List.of();
+    return erros.stream()
+        .map(e -> new NfseRejeitadaException.Rejeicao(e.getCodigo(), e.getDescricao(), e.getComplemento()))
+        .toList();
   }
 
   private NfsePostResponse lerOuNull(String body) {

@@ -104,6 +104,11 @@ public class XmlBuilder {
     }
   }
 
+  /** Leiaute usado agora: o fixo, se houver, ou o vigente no ambiente. */
+  public Leiaute leiaute() {
+    return leiauteFixo != null ? leiauteFixo : Leiaute.vigente(ambiente);
+  }
+
   /**
    * Gera o XML do DPS como String (sem assinatura).
    */
@@ -117,7 +122,7 @@ public class XmlBuilder {
   public Document buildDocument(Dps dps) {
     try {
       Document doc = documentBuilder.newDocument();
-      Element root = buildDps(doc, dps, leiauteFixo != null ? leiauteFixo : Leiaute.vigente(ambiente));
+      Element root = buildDps(doc, dps, leiaute());
       doc.appendChild(root);
       return doc;
     } catch (NfseException | IllegalStateException e) {

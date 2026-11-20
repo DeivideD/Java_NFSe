@@ -215,7 +215,7 @@ class DpsCamposFiscaisTest {
 
   /** O mesmo DPS gerado em cada leiaute passa no XSD correspondente. */
   private void validarNosDoisLeiautes(Document nt009) throws Exception {
-    validarContraXsd(xmlBuilder.toXmlString(nt009), "xsd/nt009/DPS_v1.01.xsd");
+    validarContraXsd(xmlBuilder.toXmlString(nt009), "schemas/nt009/DPS_v1.01.xsd");
   }
 
   static void validarContraXsd(String xml, String xsd) throws Exception {
