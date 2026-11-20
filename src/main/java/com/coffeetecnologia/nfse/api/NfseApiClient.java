@@ -5,7 +5,11 @@ import com.coffeetecnologia.nfse.api.request.NfsePostRequest;
 import com.coffeetecnologia.nfse.api.response.EventoResponse;
 import com.coffeetecnologia.nfse.api.response.NfsePostResponse;
 import com.coffeetecnologia.nfse.config.NfseConfig;
+import com.coffeetecnologia.nfse.config.Leiaute;
+import com.coffeetecnologia.nfse.exception.NfseComunicacaoException;
 import com.coffeetecnologia.nfse.exception.NfseException;
+import com.coffeetecnologia.nfse.exception.NfseRejeitadaException;
+import com.coffeetecnologia.nfse.model.dps.DpsMontada;
 import com.coffeetecnologia.nfse.model.dps.Dps;
 import com.coffeetecnologia.nfse.model.dps.Substituicao;
 import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
@@ -22,15 +26,26 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
+import java.io.StringReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Base64;
+import java.util.List;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -51,6 +66,8 @@ public class NfseApiClient {
 
   private static final Logger log = LoggerFactory.getLogger(NfseApiClient.class);
   private static final String CONTENT_TYPE_JSON = "application/json; charset=UTF-8";
+  private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
+  private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
 
   private final NfseConfig config;
   private final HttpClient httpClient;
@@ -67,7 +84,7 @@ public class NfseApiClient {
         .registerModule(new JavaTimeModule())
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     int tpAmb = config.getAmbiente().getTpAmb();
-    this.xmlBuilder = new XmlBuilder(tpAmb);
+    this.xmlBuilder = new XmlBuilder(config.getAmbiente(), config.getLeiaute());
     this.xmlEventoBuilder = new XmlEventoBuilder(tpAmb);
     this.xmlSigner = new XmlSigner();
     this.xmlValidator = new XmlValidator();
@@ -94,10 +111,11 @@ public class NfseApiClient {
 
     // 1. Gera XML
     Document documento = xmlBuilder.buildDocument(dps);
+    String idDps = idDps(documento);
 
     // 2. Valida contra XSD (opcional)
     if (config.isValidarXml()) {
-      xmlValidator.validarOuLancar(xmlBuilder.toXmlString(documento));
+      xmlValidator.validarOuLancar(xmlBuilder.toXmlString(documento), xmlBuilder.leiaute());
     }
 
     // 3. Assina
@@ -108,49 +126,84 @@ public class NfseApiClient {
     String dpsGZipB64 = gzipBase64(xmlAssinado);
 
     // 5. Monta request e envia
+    String bodyJson;
     try {
-      NfsePostRequest request = NfsePostRequest.builder()
-          .dpsXmlGZipB64(dpsGZipB64)
-          .build();
+      bodyJson = objectMapper.writeValueAsString(NfsePostRequest.builder().dpsXmlGZipB64(dpsGZipB64).build());
+    } catch (Exception e) {
+      throw new NfseException("Erro ao emitir NFS-e.", e);
+    }
+    String url = config.getAmbiente().getEndpointEmissao();
+    log.info("POST {} (DPS {})", url, idDps);
 
-      String bodyJson = objectMapper.writeValueAsString(request);
-      String url = config.getAmbiente().getEndpointEmissao();
-      log.info("POST {}", url);
+    HttpResponse<String> response;
+    try {
+      response = post(url, bodyJson);
+    } catch (NfseException falhaDeComunicacao) {
+      // A conexão pode cair depois de a Sefin gerar a nota: sem consultar, o chamador acharia que
+      // falhou e uma nova emissão duplicaria o serviço.
+      return recuperarPorDps(idDps).orElseThrow(() -> falhaDeComunicacao);
+    }
+    log.info("Emissão: HTTP {}", response.statusCode());
+    log.debug("Resposta da emissão: {}", response.body());
 
-      HttpResponse<String> response = post(url, bodyJson);
-
-      // LOG TEMPORÁRIO — remover depois
-      log.info("HTTP Status: {}", response.statusCode());
-      log.info("Response body: {}", response.body());
-
-      // 6. Trata resposta
-      if (response.statusCode() == 400 || response.statusCode() == 500) {
-        NfsePostResponse erro = objectMapper.readValue(response.body(), NfsePostResponse.class);
-        throw new NfseException("DPS rejeitada pela Sefin Nacional:\n" + erro.getErrosFormatados());
+    // 6. Trata resposta
+    if (response.statusCode() == 400 || response.statusCode() >= 500) {
+      NfsePostResponse erro = lerOuNull(response.body());
+      if (erro != null && erro.getErros() != null && !erro.getErros().isEmpty()) {
+        throw new NfseRejeitadaException("DPS rejeitada pela Sefin Nacional:\n" + erro.getErrosFormatados(),
+            rejeicoes(erro.getErros()));
       }
+      if (response.statusCode() >= 500) {
+        Optional<Nfse> recuperada = recuperarPorDps(idDps);
+        if (recuperada.isPresent()) return recuperada.get();
+        throw new NfseComunicacaoException("Emissão — HTTP " + response.statusCode() + " sem resposta da Sefin.");
+      }
+    }
+    tratarErroHttp(response, "Emissão");
 
-      tratarErroHttp(response, "Emissão");
-
+    try {
       NfsePostResponse sucesso = objectMapper.readValue(response.body(), NfsePostResponse.class);
       log.info("NFS-e emitida! Chave: {}", sucesso.getChaveAcesso());
-
-      // Descomprime o XML da NFS-e para armazenar no modelo
-      String xmlNfse = null;
-      if (sucesso.getNfseXmlGZipB64() != null) {
-        xmlNfse = descomprimirGzipBase64(sucesso.getNfseXmlGZipB64());
-      }
-
-      return Nfse.builder()
-          .chaveAcesso(sucesso.getChaveAcesso())
-          .numeroDps(sucesso.getIdDps())
-          .xmlNfse(xmlNfse)
-          .situacao(SituacaoNfse.NORMAL)
-          .build();
-
+      String xmlNfse = sucesso.getNfseXmlGZipB64() != null ? descomprimirGzipBase64(sucesso.getNfseXmlGZipB64()) : null;
+      return montarNfse(sucesso.getChaveAcesso(), xmlNfse, sucesso.getDataHoraProcessamento(),
+          sucesso.getIdDps() != null ? sucesso.getIdDps() : idDps);
     } catch (NfseException e) {
       throw e;
     } catch (Exception e) {
       throw new NfseException("Erro ao emitir NFS-e.", e);
+    }
+  }
+
+  /**
+   * Monta o DPS como a emissão montaria e valida contra o XSD do leiaute vigente, sem assinar e sem
+   * enviar nada à Sefin.
+   */
+  public DpsMontada montarDps(Dps dps) {
+    Document documento = xmlBuilder.buildDocument(dps);
+    Leiaute leiaute = xmlBuilder.leiaute();
+    String xml = xmlBuilder.toXmlString(documento);
+    return new DpsMontada(idDps(documento), xml, leiaute, xmlValidator.validarDps(xml, leiaute));
+  }
+
+  /**
+   * Procura a NFS-e gerada a partir do DPS (GET /dps/{id} e depois GET /nfse/{chave}). Vazio quando a
+   * Sefin não tem a nota ou a consulta também falha: nesse caso o erro original da emissão prevalece.
+   */
+  public Optional<Nfse> recuperarPorDps(String idDps) {
+    try {
+      HttpResponse<String> response = get(config.getAmbiente().getEndpointDps(idDps));
+      if (response.statusCode() != 200) {
+        log.warn("DPS {} não encontrado na Sefin após falha na emissão (HTTP {}).", idDps, response.statusCode());
+        return Optional.empty();
+      }
+      String chave = objectMapper.readValue(response.body(), NfsePostResponse.class).getChaveAcesso();
+      if (chave == null || chave.isBlank()) return Optional.empty();
+      log.warn("Emissão do DPS {} não teve resposta, mas a Sefin gerou a NFS-e {}. Recuperada.", idDps, chave);
+      Nfse nfse = consultar(chave);
+      return Optional.of(nfse.toBuilder().numeroDps(idDps).build());
+    } catch (Exception e) {
+      log.warn("Não foi possível consultar o DPS {} após falha na emissão: {}", idDps, e.getMessage());
+      return Optional.empty();
     }
   }
 
@@ -173,11 +226,7 @@ public class NfseApiClient {
       String xmlNfse = r.getNfseXmlGZipB64() != null
           ? descomprimirGzipBase64(r.getNfseXmlGZipB64()) : null;
 
-      return Nfse.builder()
-          .chaveAcesso(chaveAcesso)
-          .xmlNfse(xmlNfse)
-          .situacao(SituacaoNfse.NORMAL)
-          .build();
+      return montarNfse(chaveAcesso, xmlNfse, r.getDataHoraProcessamento(), r.getIdDps());
     } catch (Exception e) {
       throw new NfseException("Erro ao parsear resposta da consulta.", e);
     }
@@ -226,12 +275,13 @@ public class NfseApiClient {
 
       HttpResponse<String> response = post(url, bodyJson);
 
-      log.info("HTTP Status: {}", response.statusCode());
-      log.info("Response body: {}", response.body());
+      log.info("Evento: HTTP {}", response.statusCode());
+      log.debug("Resposta do evento: {}", response.body());
 
       if (response.statusCode() == 400 || response.statusCode() == 500) {
         EventoResponse erro = objectMapper.readValue(response.body(), EventoResponse.class);
-        throw new NfseException("Evento rejeitado pela Sefin Nacional:\n" + erro.getErrosFormatados());
+        throw new NfseRejeitadaException("Evento rejeitado pela Sefin Nacional:\n" + erro.getErrosFormatados(),
+            rejeicoes(erro.getErros()));
       }
 
       tratarErroHttp(response, "Cancelamento");
@@ -305,7 +355,7 @@ public class NfseApiClient {
           .build();
       return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     } catch (Exception e) {
-      throw new NfseException("Erro de comunicação com a Sefin Nacional (POST): " + url, e);
+      throw new NfseComunicacaoException("Erro de comunicação com a Sefin Nacional (POST): " + url, e);
     }
   }
 
@@ -319,7 +369,7 @@ public class NfseApiClient {
           .build();
       return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     } catch (Exception e) {
-      throw new NfseException("Erro de comunicação com a Sefin Nacional (GET): " + url, e);
+      throw new NfseComunicacaoException("Erro de comunicação com a Sefin Nacional (GET): " + url, e);
     }
   }
 
@@ -330,6 +380,74 @@ public class NfseApiClient {
     if (status == 401) throw new NfseException(operacao + " — não foi possível obter o certificado (401).");
     if (status == 404) throw new NfseException(operacao + " — não encontrado (404): " + response.body());
     throw new NfseException(operacao + " — HTTP " + status + ": " + response.body());
+  }
+
+  // ========================
+  // Montagem do resultado
+  // ========================
+
+  /**
+   * Número da NFS-e e data de processamento vêm do XML gerado pela Sefin ({@code <nNFSe>}, {@code <dhProc>});
+   * na falta do XML, a data vem do JSON da resposta.
+   */
+  Nfse montarNfse(String chaveAcesso, String xmlNfse, OffsetDateTime dataHoraProcessamento, String idDps) {
+    String numero = null;
+    LocalDateTime dataEmissao = dataHoraProcessamento != null
+        ? dataHoraProcessamento.atZoneSameInstant(ZONE_BR).toLocalDateTime() : null;
+    if (xmlNfse != null) {
+      try {
+        Document nfse = lerXml(xmlNfse);
+        numero = textoDe(nfse, "nNFSe");
+        String dhProc = textoDe(nfse, "dhProc");
+        if (dhProc != null) {
+          dataEmissao = OffsetDateTime.parse(dhProc).atZoneSameInstant(ZONE_BR).toLocalDateTime();
+        }
+      } catch (Exception e) {
+        log.warn("NFS-e {} emitida, mas o XML devolvido não pôde ser lido: {}", chaveAcesso, e.getMessage());
+      }
+    }
+    return Nfse.builder()
+        .chaveAcesso(chaveAcesso)
+        .numero(numero)
+        .dataEmissao(dataEmissao)
+        .xmlNfse(xmlNfse)
+        .numeroDps(idDps)
+        .situacao(SituacaoNfse.NORMAL)
+        .build();
+  }
+
+  private static String idDps(Document dps) {
+    NodeList nodes = dps.getElementsByTagNameNS(NS, "infDPS");
+    return nodes.getLength() == 0 ? null : ((Element) nodes.item(0)).getAttribute("Id");
+  }
+
+  private static Document lerXml(String xml) throws Exception {
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setNamespaceAware(true);
+    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    return factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
+  }
+
+  private static String textoDe(Document doc, String tag) {
+    NodeList nodes = doc.getElementsByTagNameNS(NS, tag);
+    if (nodes.getLength() == 0) return null;
+    String texto = nodes.item(0).getTextContent();
+    return texto == null || texto.isBlank() ? null : texto.trim();
+  }
+
+  private static List<NfseRejeitadaException.Rejeicao> rejeicoes(List<NfsePostResponse.MensagemProcessamento> erros) {
+    if (erros == null) return List.of();
+    return erros.stream()
+        .map(e -> new NfseRejeitadaException.Rejeicao(e.getCodigo(), e.getDescricao(), e.getComplemento()))
+        .toList();
+  }
+
+  private NfsePostResponse lerOuNull(String body) {
+    try {
+      return body == null || body.isBlank() ? null : objectMapper.readValue(body, NfsePostResponse.class);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   // ========================

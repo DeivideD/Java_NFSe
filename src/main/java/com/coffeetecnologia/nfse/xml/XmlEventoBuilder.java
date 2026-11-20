@@ -42,7 +42,7 @@ public class XmlEventoBuilder {
 
   private static final String NS = "http://www.sped.fazenda.gov.br/nfse";
   private static final String VERSAO = "1.01";
-  private static final String VER_APLIC = "java-nfse-1.1.0";
+  private static final String VER_APLIC = "java-nfse-1.3.0";
   private static final ZoneId ZONE_BR = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter FMT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssxxx");
 

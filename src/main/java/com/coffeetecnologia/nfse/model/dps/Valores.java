@@ -48,6 +48,12 @@ public class Valores {
   @Builder.Default
   private final BigDecimal valorInss = BigDecimal.ZERO;
 
+  /**
+   * Percentual aproximado dos tributos do Simples Nacional ({@code totTrib/pTotTribSN}), em % (ex.: 6.00).
+   * Obrigatório para optante ME/EPP: a Sefin recusa o {@code indTotTrib} para ME/EPP (E0712).
+   */
+  private final BigDecimal percentualTributosSimplesNacional;
+
   /** Indica se o ISS é retido pelo tomador. */
   @Builder.Default
   private final boolean issRetido = false;

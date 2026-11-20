@@ -7,9 +7,11 @@ import com.coffeetecnologia.nfse.api.response.DfeResponse;
 import com.coffeetecnologia.nfse.auth.CertificadoDigital;
 import com.coffeetecnologia.nfse.auth.ClientCertificateKeyManager;
 import com.coffeetecnologia.nfse.config.Ambiente;
+import com.coffeetecnologia.nfse.config.Leiaute;
 import com.coffeetecnologia.nfse.config.NfseConfig;
 import com.coffeetecnologia.nfse.exception.NfseException;
 import com.coffeetecnologia.nfse.model.dps.Dps;
+import com.coffeetecnologia.nfse.model.dps.DpsMontada;
 import com.coffeetecnologia.nfse.model.evento.PedidoEvento;
 import com.coffeetecnologia.nfse.model.evento.ResultadoEvento;
 import com.coffeetecnologia.nfse.model.nfse.Nfse;
@@ -60,6 +62,11 @@ public class NfseClient {
   // ========================
   // Emissão
   // ========================
+
+  /** Monta e valida o DPS no XSD do leiaute vigente, sem assinar e sem enviar. */
+  public DpsMontada montarDps(Dps dps) {
+    return apiClient.montarDps(dps);
+  }
 
   /** Emite uma NFS-e a partir de um DPS. POST /SefinNacional/nfse */
   public Nfse emitir(Dps dps) {
@@ -171,6 +178,11 @@ public class NfseClient {
 
     public Builder timeout(Duration timeout) {
       configBuilder.timeout(timeout);
+      return this;
+    }
+
+    public Builder leiaute(Leiaute leiaute) {
+      configBuilder.leiaute(leiaute);
       return this;
     }
 

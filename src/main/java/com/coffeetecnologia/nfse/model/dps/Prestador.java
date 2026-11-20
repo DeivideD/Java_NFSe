@@ -13,7 +13,16 @@ public class Prestador {
   private final String cnpj;
   private final String cpf;
   private final String inscricaoMunicipal;
+  /** Município (IBGE, 7 dígitos) onde o prestador é cadastrado: vai em {@code <cLocEmi>}. */
   private final String codigoMunicipio;
+  /** Situação perante o Simples Nacional. */
+  @Builder.Default
+  private final OpcaoSimplesNacional opcaoSimplesNacional = OpcaoSimplesNacional.NAO_OPTANTE;
+  /** Regime de apuração do ME/EPP acima do sublimite (opcional, só com {@link OpcaoSimplesNacional#ME_EPP}). */
+  private final RegimeApuracaoSimplesNacional regimeApuracaoSimplesNacional;
+  /** Regime especial de tributação. */
+  @Builder.Default
+  private final RegimeEspecialTributacao regimeEspecialTributacao = RegimeEspecialTributacao.NENHUM;
 
   /** Cria prestador identificado por CNPJ (apenas dígitos). */
   public static Prestador comCnpj(String cnpj) {

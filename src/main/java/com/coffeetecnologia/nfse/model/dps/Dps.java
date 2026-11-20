@@ -64,8 +64,19 @@ public class Dps {
   /** Valores monetários (preço, tributos, deduções). */
   private final Valores valores;
 
-  /** Local de prestação do serviço (município IBGE). */
+  /**
+   * Município emissor (IBGE): onde o prestador está cadastrado, vai em {@code <cLocEmi>}.
+   * Também é o local da prestação quando {@link #codigoMunicipioPrestacao} não é informado.
+   * Se {@link Prestador#getCodigoMunicipio()} estiver preenchido, ele prevalece como município emissor.
+   */
   private final String codigoMunicipio;
+  /** Município (IBGE) onde o serviço foi prestado ({@code <locPrest><cLocPrestacao>}). Padrão: o emissor. */
+  private final String codigoMunicipioPrestacao;
+  /**
+   * Data de competência ({@code <dCompet>}): dia em que se iniciou a prestação do serviço.
+   * Padrão: a data da emissão. Não pode ser posterior à data da emissão.
+   */
+  private final LocalDate dataCompetencia;
 
   /** Natureza da operação conforme tabela da RFB. */
   @Builder.Default

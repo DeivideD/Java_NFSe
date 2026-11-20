@@ -1,5 +1,7 @@
 package com.coffeetecnologia.nfse.xml;
 
+import com.coffeetecnologia.nfse.config.Ambiente;
+import com.coffeetecnologia.nfse.config.Leiaute;
 import com.coffeetecnologia.nfse.model.dps.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +33,8 @@ class IbscbsXmlBuilderTest {
 
   @BeforeEach
   void setUp() {
-    xmlBuilder = new XmlBuilder();
+    // Leiaute da NT 004 (Produção até 30/11/2026); o da NT 009 está em DpsLeiauteNt009Test
+    xmlBuilder = new XmlBuilder(Ambiente.PRODUCAO, Leiaute.NT_004);
     dpsBase = criarDpsBase();
   }
 
@@ -341,7 +344,7 @@ class IbscbsXmlBuilderTest {
   // ========================
 
   private void validarContraXsd(String xml) throws SAXException, java.io.IOException {
-    URL xsdUrl = getClass().getClassLoader().getResource("xsd/DPS_v1.01.xsd");
+    URL xsdUrl = getClass().getClassLoader().getResource("schemas/nt004/DPS_v1.01.xsd");
     assertNotNull(xsdUrl, "XSD DPS_v1.01.xsd deve estar em src/test/resources/xsd/");
 
     SchemaFactory sf = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
