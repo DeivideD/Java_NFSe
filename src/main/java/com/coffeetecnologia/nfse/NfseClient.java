@@ -7,6 +7,7 @@ import com.coffeetecnologia.nfse.api.response.DfeResponse;
 import com.coffeetecnologia.nfse.auth.CertificadoDigital;
 import com.coffeetecnologia.nfse.auth.ClientCertificateKeyManager;
 import com.coffeetecnologia.nfse.config.Ambiente;
+import com.coffeetecnologia.nfse.config.Leiaute;
 import com.coffeetecnologia.nfse.config.NfseConfig;
 import com.coffeetecnologia.nfse.exception.NfseException;
 import com.coffeetecnologia.nfse.model.dps.Dps;
@@ -171,6 +172,11 @@ public class NfseClient {
 
     public Builder timeout(Duration timeout) {
       configBuilder.timeout(timeout);
+      return this;
+    }
+
+    public Builder leiaute(Leiaute leiaute) {
+      configBuilder.leiaute(leiaute);
       return this;
     }
 

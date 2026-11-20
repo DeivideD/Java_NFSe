@@ -42,6 +42,12 @@ public class NfseConfig {
   private final String zoneId = "America/Sao_Paulo";
 
   /**
+   * Leiaute fixo da DPS. Nulo (padrão) = o vigente no ambiente na data da emissão ({@link Leiaute#vigente}).
+   * Fixe só se a Receita mudar o calendário da NT 009.
+   */
+  private final Leiaute leiaute;
+
+  /**
    * Valida que as configurações obrigatórias estão presentes.
    */
   public void validar() {

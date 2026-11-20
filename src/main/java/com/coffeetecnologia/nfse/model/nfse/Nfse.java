@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
  * NFS-e emitida e armazenada pelo sistema nacional.
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class Nfse {
 
   /** Número da NFS-e (gerado pelo fisco). */
@@ -18,7 +18,7 @@ public class Nfse {
   /** Código de verificação da NFS-e. */
   private final String codigoVerificacao;
 
-  /** Chave de acesso (44 dígitos). */
+  /** Chave de acesso (50 dígitos). */
   private final String chaveAcesso;
 
   /** Data e hora de emissão pela prefeitura. */

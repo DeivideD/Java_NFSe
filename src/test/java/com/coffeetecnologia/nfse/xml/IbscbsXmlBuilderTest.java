@@ -1,5 +1,7 @@
 package com.coffeetecnologia.nfse.xml;
 
+import com.coffeetecnologia.nfse.config.Ambiente;
+import com.coffeetecnologia.nfse.config.Leiaute;
 import com.coffeetecnologia.nfse.model.dps.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +33,8 @@ class IbscbsXmlBuilderTest {
 
   @BeforeEach
   void setUp() {
-    xmlBuilder = new XmlBuilder();
+    // Leiaute da NT 004 (Produção até 30/11/2026); o da NT 009 está em DpsLeiauteNt009Test
+    xmlBuilder = new XmlBuilder(Ambiente.PRODUCAO, Leiaute.NT_004);
     dpsBase = criarDpsBase();
   }
 
