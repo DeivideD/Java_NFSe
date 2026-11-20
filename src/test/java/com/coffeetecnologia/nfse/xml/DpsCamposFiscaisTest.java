@@ -30,6 +30,36 @@ class DpsCamposFiscaisTest {
 
   private final XmlBuilder xmlBuilder = new XmlBuilder(Ambiente.PRODUCAO_RESTRITA, Leiaute.NT_009);
 
+  // --- cTribMun -----------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("cTribMun vai logo depois do cTribNac e valida no XSD")
+  void codigoTributacaoMunicipal() throws Exception {
+    Servico servico = Servico.builder().codigoServico("010601").codigoTributacaoMunicipal("001")
+        .descricao("Desenvolvimento de software").codigoNbs("115011000").build();
+    Document doc = xmlBuilder.buildDocument(dps().servico(servico).build());
+
+    Element cServ = (Element) doc.getElementsByTagNameNS(NS, "cServ").item(0);
+    assertEquals("cTribNac", cServ.getFirstChild().getLocalName());
+    assertEquals("cTribMun", cServ.getFirstChild().getNextSibling().getLocalName());
+    assertEquals("001", texto(doc, "cTribMun"));
+    validarNosDoisLeiautes(doc);
+  }
+
+  @Test
+  @DisplayName("Sem cTribMun o elemento não aparece")
+  void semCodigoTributacaoMunicipal() throws Exception {
+    Document doc = xmlBuilder.buildDocument(dps().build());
+    assertEquals(0, doc.getElementsByTagNameNS(NS, "cTribMun").getLength());
+  }
+
+  @Test
+  @DisplayName("cTribMun fora do padrão de 3 dígitos é recusado antes de enviar")
+  void codigoTributacaoMunicipalInvalido() {
+    Servico servico = Servico.builder().codigoServico("010601").codigoTributacaoMunicipal("01").descricao("x").build();
+    assertThrows(NfseException.class, () -> xmlBuilder.buildDocument(dps().servico(servico).build()));
+  }
+
   // --- regTrib ------------------------------------------------------------------------------
 
   @Test

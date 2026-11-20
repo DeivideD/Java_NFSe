@@ -10,6 +10,13 @@ import java.math.BigDecimal;
 public class Servico {
 
   private final String codigoServico;
+
+  /**
+   * Código de tributação municipal ({@code cTribMun}, 3 dígitos): o desdobro do {@code cTribNac} que o
+   * município administra. Obrigatório onde o município parametrizou desdobros (ex.: Fortaleza usa 01.06.01.001;
+   * sem ele a Sefin rejeita com E0312). Nulo = não informado.
+   */
+  private final String codigoTributacaoMunicipal;
   private final String descricao;
   private final String cnae;
   private final String codigoNbs;

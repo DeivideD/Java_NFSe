@@ -360,6 +360,11 @@ public class XmlBuilder {
     // <cServ>
     Element cServ = doc.createElementNS(NS, "cServ");
     addEl(doc, cServ, "cTribNac", servico.getCodigoServico());
+    // cTribMun vem logo depois do cTribNac nos dois leiautes (TCServ)
+    String cTribMun = codigoTributacaoMunicipal(servico);
+    if (cTribMun != null) {
+      addEl(doc, cServ, "cTribMun", cTribMun);
+    }
     // NT 009: xDescServ passou para depois de cNBS
     if (leiaute == Leiaute.NT_004) {
       addEl(doc, cServ, "xDescServ", servico.getDescricao());
@@ -458,6 +463,15 @@ public class XmlBuilder {
           + dataEmissao + ").");
     }
     return competencia;
+  }
+
+  private static String codigoTributacaoMunicipal(Servico servico) {
+    String codigo = trimToNull(servico.getCodigoTributacaoMunicipal());
+    if (codigo == null) return null;
+    if (!codigo.matches("\\d{3}")) {
+      throw new NfseException("O código de tributação municipal (cTribMun) deve ter 3 dígitos: " + codigo);
+    }
+    return codigo;
   }
 
   private static String finNFSe(Dps dps) {
