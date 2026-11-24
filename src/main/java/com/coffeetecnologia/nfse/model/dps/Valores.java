@@ -32,21 +32,30 @@ public class Valores {
   @Builder.Default
   private final BigDecimal valorIr = BigDecimal.ZERO;
 
-  /** Valor retido de PIS. Ainda não vai na DPS: a geração recusa valor diferente de zero. */
+  /** PIS retido pelo tomador: vai somado com COFINS e CSLL retidas em {@code vRetCSLL} (NT 007). */
   @Builder.Default
   private final BigDecimal valorPis = BigDecimal.ZERO;
 
-  /** Valor retido de COFINS. Ainda não vai na DPS: a geração recusa valor diferente de zero. */
+  /** COFINS retida pelo tomador: vai somada com PIS e CSLL retidos em {@code vRetCSLL} (NT 007). */
   @Builder.Default
   private final BigDecimal valorCofins = BigDecimal.ZERO;
 
-  /** Valor retido de CSLL pelo tomador ({@code tribFed/vRetCSLL}). */
+  /** CSLL retida pelo tomador: vai somada com PIS e COFINS retidos em {@code vRetCSLL} (NT 007). */
   @Builder.Default
   private final BigDecimal valorCsll = BigDecimal.ZERO;
 
   /** Valor retido de INSS (contribuição previdenciária) pelo tomador ({@code tribFed/vRetCP}). */
   @Builder.Default
   private final BigDecimal valorInss = BigDecimal.ZERO;
+
+  /**
+   * CST do PIS/COFINS ({@code piscofins/CST}, 2 dígitos). Obrigatório quando há PIS, COFINS ou CSLL retidos ou
+   * apuração própria: o tipo de retenção só existe dentro do grupo {@code piscofins}.
+   */
+  private final String cstPisCofins;
+
+  /** PIS/COFINS de apuração própria do prestador; nulo para não informar. */
+  private final ApuracaoPisCofins apuracaoPisCofins;
 
   /**
    * Percentual aproximado dos tributos do Simples Nacional ({@code totTrib/pTotTribSN}), em % (ex.: 6.00).

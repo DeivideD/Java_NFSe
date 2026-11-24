@@ -3,6 +3,7 @@ package com.coffeetecnologia.nfse.xml;
 import com.coffeetecnologia.nfse.config.Ambiente;
 import com.coffeetecnologia.nfse.config.Leiaute;
 import com.coffeetecnologia.nfse.exception.NfseException;
+import com.coffeetecnologia.nfse.model.dps.ApuracaoPisCofins;
 import com.coffeetecnologia.nfse.model.dps.Dps;
 import com.coffeetecnologia.nfse.model.dps.Prestador;
 import com.coffeetecnologia.nfse.model.dps.Servico;
@@ -50,19 +51,77 @@ class DpsRetencoesFederaisTest {
   }
 
   @Test
-  @DisplayName("INSS, IRRF e CSLL na ordem do XSD")
-  void todasAsRetencoesNaOrdem() throws Exception {
+  @DisplayName("PIS, COFINS e CSLL retidos: somados em vRetCSLL e tpRetPisCofins 3 no piscofins, na ordem do XSD")
+  void contribuicoesRetidasSomadasEmVRetCsll() throws Exception {
     Valores valores = Valores.builder()
         .valorServico(new BigDecimal("10000.00"))
         .valorInss(new BigDecimal("1100.00"))
         .valorIr(new BigDecimal("150.00"))
+        .valorPis(new BigDecimal("65.00"))
+        .valorCofins(new BigDecimal("300.00"))
         .valorCsll(new BigDecimal("100.00"))
+        .cstPisCofins("01")
         .build();
     Document doc = xmlBuilder.buildDocument(dps(valores).build());
 
     Element tribFed = (Element) doc.getElementsByTagNameNS(NS, "tribFed").item(0);
-    assertEquals(List.of("vRetCP", "vRetIRRF", "vRetCSLL"), filhos(tribFed));
-    DpsCamposFiscaisTest.validarContraXsd(xmlBuilder.toXmlString(doc), "schemas/nt009/DPS_v1.01.xsd");
+    assertEquals(List.of("piscofins", "vRetCP", "vRetIRRF", "vRetCSLL"), filhos(tribFed));
+    Element piscofins = (Element) doc.getElementsByTagNameNS(NS, "piscofins").item(0);
+    assertEquals(List.of("CST", "tpRetPisCofins"), filhos(piscofins));
+    assertEquals("3", texto(doc, "tpRetPisCofins"));
+    assertEquals("465.00", texto(doc, "vRetCSLL"));
+    assertEquals(0, doc.getElementsByTagNameNS(NS, "vPis").getLength());
+    assertEquals(new BigDecimal("8285.00"), valores.getValorLiquido());
+    validarNosDoisLeiautes(dps(valores).build());
+  }
+
+  @Test
+  @DisplayName("Tipo de retenção para cada combinação de PIS, COFINS e CSLL (NT 007)")
+  void tipoDeRetencaoPorCombinacao() {
+    assertEquals("0", XmlBuilder.tipoRetencaoPisCofins(false, false, false));
+    assertEquals("3", XmlBuilder.tipoRetencaoPisCofins(true, true, true));
+    assertEquals("4", XmlBuilder.tipoRetencaoPisCofins(true, true, false));
+    assertEquals("5", XmlBuilder.tipoRetencaoPisCofins(true, false, false));
+    assertEquals("6", XmlBuilder.tipoRetencaoPisCofins(false, true, false));
+    assertEquals("7", XmlBuilder.tipoRetencaoPisCofins(false, true, true));
+    assertEquals("8", XmlBuilder.tipoRetencaoPisCofins(false, false, true));
+    assertEquals("9", XmlBuilder.tipoRetencaoPisCofins(true, false, true));
+  }
+
+  @Test
+  @DisplayName("Apuração própria sem retenção: vBC, alíquotas, vPis e vCofins com tpRetPisCofins 0")
+  void apuracaoPropria() throws Exception {
+    Valores valores = Valores.builder()
+        .valorServico(new BigDecimal("1000.00"))
+        .cstPisCofins("01")
+        .apuracaoPisCofins(ApuracaoPisCofins.builder()
+            .baseCalculo(new BigDecimal("1000.00"))
+            .aliquotaPis(new BigDecimal("0.65"))
+            .aliquotaCofins(new BigDecimal("3.00"))
+            .valorPis(new BigDecimal("6.50"))
+            .valorCofins(new BigDecimal("30.00"))
+            .build())
+        .build();
+    Document doc = xmlBuilder.buildDocument(dps(valores).build());
+
+    Element piscofins = (Element) doc.getElementsByTagNameNS(NS, "piscofins").item(0);
+    assertEquals(List.of("CST", "vBCPisCofins", "pAliqPis", "pAliqCofins", "vPis", "vCofins", "tpRetPisCofins"),
+        filhos(piscofins));
+    assertEquals("0", texto(doc, "tpRetPisCofins"));
+    assertEquals(0, doc.getElementsByTagNameNS(NS, "vRetCSLL").getLength());
+    assertEquals(new BigDecimal("1000.00"), valores.getValorLiquido());
+    validarNosDoisLeiautes(dps(valores).build());
+  }
+
+  @Test
+  @DisplayName("Só CSLL retida: tpRetPisCofins 8 e vRetCSLL com a CSLL")
+  void soCsll() throws Exception {
+    Valores valores = Valores.builder().valorServico(new BigDecimal("1000.00"))
+        .valorCsll(new BigDecimal("10.00")).cstPisCofins("01").build();
+    Document doc = xmlBuilder.buildDocument(dps(valores).build());
+
+    assertEquals("8", texto(doc, "tpRetPisCofins"));
+    assertEquals("10.00", texto(doc, "vRetCSLL"));
   }
 
   @Test
@@ -73,10 +132,17 @@ class DpsRetencoesFederaisTest {
   }
 
   @Test
-  @DisplayName("PIS/COFINS retidos ainda não são gerados: recusa antes de enviar")
-  void pisCofinsRecusado() {
+  @DisplayName("Contribuição retida sem CST é recusada antes de enviar")
+  void semCstRecusado() {
     Valores valores = Valores.builder().valorServico(new BigDecimal("100.00")).valorPis(new BigDecimal("0.65")).build();
     assertThrows(NfseException.class, () -> xmlBuilder.buildDocument(dps(valores).build()));
+  }
+
+  private static void validarNosDoisLeiautes(Dps dps) throws Exception {
+    XmlBuilder nt009 = new XmlBuilder(Ambiente.PRODUCAO_RESTRITA, Leiaute.NT_009);
+    XmlBuilder nt004 = new XmlBuilder(Ambiente.PRODUCAO_RESTRITA, Leiaute.NT_004);
+    DpsCamposFiscaisTest.validarContraXsd(nt009.build(dps), "schemas/nt009/DPS_v1.01.xsd");
+    DpsCamposFiscaisTest.validarContraXsd(nt004.build(dps), "schemas/nt004/DPS_v1.01.xsd");
   }
 
   private static Dps.DpsBuilder dps(Valores valores) {
