@@ -14,6 +14,7 @@ import com.coffeetecnologia.nfse.model.dps.Prestador;
 import com.coffeetecnologia.nfse.model.dps.Servico;
 import com.coffeetecnologia.nfse.model.dps.Substituicao;
 import com.coffeetecnologia.nfse.model.dps.Tomador;
+import com.coffeetecnologia.nfse.model.dps.ApuracaoPisCofins;
 import com.coffeetecnologia.nfse.model.dps.Valores;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -409,6 +410,12 @@ public class XmlBuilder {
     }
     trib.appendChild(tribMun);
 
+    // <tribFed> — retenções federais pelo tomador (opcional; só aparece com algum valor retido)
+    Element tribFed = buildTribFed(doc, valores);
+    if (tribFed != null) {
+      trib.appendChild(tribFed);
+    }
+
     // <totTrib> — total aproximado de tributos (obrigatório). ME/EPP informa pTotTribSN (o indTotTrib
     // é recusado com E0712); os demais, indTotTrib = 0 ("não informar valor estimado").
     Element totTrib = doc.createElementNS(NS, "totTrib");
@@ -422,6 +429,72 @@ public class XmlBuilder {
     el.appendChild(trib);
 
     return el;
+  }
+
+  /**
+   * Tributação federal, na ordem do XSD: {@code piscofins}, {@code vRetCP} (INSS), {@code vRetIRRF} e
+   * {@code vRetCSLL}. Pela NT 007, PIS, COFINS e CSLL retidos vão SOMADOS em {@code vRetCSLL} e o
+   * {@code tpRetPisCofins} diz quais foram retidos; {@code vPis}/{@code vCofins} são só da apuração própria.
+   * Sem retenção nem apuração própria o grupo não aparece.
+   */
+  private Element buildTribFed(Document doc, Valores valores) {
+    boolean pis = positivo(valores.getValorPis());
+    boolean cofins = positivo(valores.getValorCofins());
+    boolean csll = positivo(valores.getValorCsll());
+    boolean inss = positivo(valores.getValorInss());
+    boolean irrf = positivo(valores.getValorIr());
+    ApuracaoPisCofins apuracao = valores.getApuracaoPisCofins();
+    boolean grupoPisCofins = pis || cofins || csll || apuracao != null;
+    if (!grupoPisCofins && !inss && !irrf) {
+      return null;
+    }
+
+    Element el = doc.createElementNS(NS, "tribFed");
+    if (grupoPisCofins) {
+      String cst = valores.getCstPisCofins();
+      if (cst == null || !cst.matches("\\d{2}")) {
+        throw new NfseException("Informe o CST do PIS/COFINS (2 dígitos): é obrigatório com PIS, COFINS ou CSLL "
+            + "retidos ou com apuração própria.");
+      }
+      Element piscofins = doc.createElementNS(NS, "piscofins");
+      addEl(doc, piscofins, "CST", cst);
+      if (apuracao != null) {
+        addElSe(doc, piscofins, "vBCPisCofins", apuracao.getBaseCalculo());
+        addElSe(doc, piscofins, "pAliqPis", apuracao.getAliquotaPis());
+        addElSe(doc, piscofins, "pAliqCofins", apuracao.getAliquotaCofins());
+        addElSe(doc, piscofins, "vPis", apuracao.getValorPis());
+        addElSe(doc, piscofins, "vCofins", apuracao.getValorCofins());
+      }
+      addEl(doc, piscofins, "tpRetPisCofins", tipoRetencaoPisCofins(pis, cofins, csll));
+      el.appendChild(piscofins);
+    }
+    if (inss) addEl(doc, el, "vRetCP", fmt(valores.getValorInss()));
+    if (irrf) addEl(doc, el, "vRetIRRF", fmt(valores.getValorIr()));
+    if (pis || cofins || csll) {
+      addEl(doc, el, "vRetCSLL", fmt(zeroSeNulo(valores.getValorPis()).add(zeroSeNulo(valores.getValorCofins()))
+          .add(zeroSeNulo(valores.getValorCsll()))));
+    }
+    return el;
+  }
+
+  /** {@code tpRetPisCofins} da NT 007: qual das três contribuições foi retida (0 = nenhuma). */
+  static String tipoRetencaoPisCofins(boolean pis, boolean cofins, boolean csll) {
+    if (pis && cofins) return csll ? "3" : "4";
+    if (pis) return csll ? "9" : "5";
+    if (cofins) return csll ? "7" : "6";
+    return csll ? "8" : "0";
+  }
+
+  private void addElSe(Document doc, Element pai, String nome, BigDecimal valor) {
+    if (valor != null) addEl(doc, pai, nome, fmt(valor));
+  }
+
+  private static BigDecimal zeroSeNulo(BigDecimal valor) {
+    return valor != null ? valor : BigDecimal.ZERO;
+  }
+
+  private static boolean positivo(BigDecimal valor) {
+    return valor != null && valor.signum() > 0;
   }
 
   // ========================
