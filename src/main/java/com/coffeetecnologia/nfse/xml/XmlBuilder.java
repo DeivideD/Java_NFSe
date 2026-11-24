@@ -409,6 +409,12 @@ public class XmlBuilder {
     }
     trib.appendChild(tribMun);
 
+    // <tribFed> — retenções federais pelo tomador (opcional; só aparece com algum valor retido)
+    Element tribFed = buildTribFed(doc, valores);
+    if (tribFed != null) {
+      trib.appendChild(tribFed);
+    }
+
     // <totTrib> — total aproximado de tributos (obrigatório). ME/EPP informa pTotTribSN (o indTotTrib
     // é recusado com E0712); os demais, indTotTrib = 0 ("não informar valor estimado").
     Element totTrib = doc.createElementNS(NS, "totTrib");
@@ -422,6 +428,32 @@ public class XmlBuilder {
     el.appendChild(trib);
 
     return el;
+  }
+
+  /**
+   * Retenções federais: INSS ({@code vRetCP}), IRRF e CSLL, na ordem do XSD. PIS/COFINS ficam no grupo
+   * {@code piscofins}, que exige CST e ainda não é gerado: com valor de PIS ou COFINS, recusa antes de enviar
+   * para a nota não sair com valor líquido diferente do XML.
+   */
+  private Element buildTribFed(Document doc, Valores valores) {
+    if (positivo(valores.getValorPis()) || positivo(valores.getValorCofins())) {
+      throw new NfseException("Retenção de PIS/COFINS ainda não é suportada na DPS.");
+    }
+    boolean inss = positivo(valores.getValorInss());
+    boolean irrf = positivo(valores.getValorIr());
+    boolean csll = positivo(valores.getValorCsll());
+    if (!inss && !irrf && !csll) {
+      return null;
+    }
+    Element el = doc.createElementNS(NS, "tribFed");
+    if (inss) addEl(doc, el, "vRetCP", fmt(valores.getValorInss()));
+    if (irrf) addEl(doc, el, "vRetIRRF", fmt(valores.getValorIr()));
+    if (csll) addEl(doc, el, "vRetCSLL", fmt(valores.getValorCsll()));
+    return el;
+  }
+
+  private static boolean positivo(BigDecimal valor) {
+    return valor != null && valor.signum() > 0;
   }
 
   // ========================

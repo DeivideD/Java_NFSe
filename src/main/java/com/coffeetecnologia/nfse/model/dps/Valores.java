@@ -28,23 +28,23 @@ public class Valores {
   /** Valor do ISS calculado. Calculado automaticamente se não informado. */
   private final BigDecimal valorIss;
 
-  /** Valor retido de IRPJ. */
+  /** Valor retido de IRRF pelo tomador ({@code tribFed/vRetIRRF}). */
   @Builder.Default
   private final BigDecimal valorIr = BigDecimal.ZERO;
 
-  /** Valor retido de PIS. */
+  /** Valor retido de PIS. Ainda não vai na DPS: a geração recusa valor diferente de zero. */
   @Builder.Default
   private final BigDecimal valorPis = BigDecimal.ZERO;
 
-  /** Valor retido de COFINS. */
+  /** Valor retido de COFINS. Ainda não vai na DPS: a geração recusa valor diferente de zero. */
   @Builder.Default
   private final BigDecimal valorCofins = BigDecimal.ZERO;
 
-  /** Valor retido de CSLL. */
+  /** Valor retido de CSLL pelo tomador ({@code tribFed/vRetCSLL}). */
   @Builder.Default
   private final BigDecimal valorCsll = BigDecimal.ZERO;
 
-  /** Valor retido de INSS. */
+  /** Valor retido de INSS (contribuição previdenciária) pelo tomador ({@code tribFed/vRetCP}). */
   @Builder.Default
   private final BigDecimal valorInss = BigDecimal.ZERO;
 
