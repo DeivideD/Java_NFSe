@@ -68,6 +68,35 @@ class DpsLeiauteNt009Test {
   }
 
   @Test
+  @DisplayName("Sem IBSCBS (Simples): indDest=0 vai em infDPS logo após toma (XSD da Sefin de 24/11/2026)")
+  void indDestEmInfDpsSemIbscbs() throws Exception {
+    Document doc = nt009.buildDocument(dps().build());
+
+    List<String> filhos = filhos(doc.getElementsByTagNameNS(NS, "infDPS").item(0));
+    assertEquals(filhos.indexOf("toma") + 1, filhos.indexOf("indDest"));
+    assertEquals(filhos.indexOf("indDest") + 1, filhos.indexOf("serv"));
+    assertEquals("0", doc.getElementsByTagNameNS(NS, "indDest").item(0).getTextContent());
+    assertEquals(0, doc.getElementsByTagNameNS(NS, "IBSCBS").getLength());
+    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "schemas/nt009/DPS_v1.01.xsd");
+  }
+
+  @Test
+  @DisplayName("Com IBSCBS e destinatário: indDest e dest saem do grupo e vão para infDPS")
+  void indDestEDestSaemDoIbscbs() throws Exception {
+    Ibscbs comDest = Ibscbs.builder().cIndOp("010000").indDest("1")
+        .dest(Dest.builder().cnpj("11222333000181").xNome("Destino Ltda").build())
+        .gIbscbs(GIbscbs.builder().cst("000").cClassTrib("000001").build()).build();
+    Document doc = nt009.buildDocument(dps().ibscbs(comDest).build());
+
+    List<String> filhos = filhos(doc.getElementsByTagNameNS(NS, "infDPS").item(0));
+    assertEquals(filhos.indexOf("toma") + 1, filhos.indexOf("indDest"));
+    assertEquals(filhos.indexOf("indDest") + 1, filhos.indexOf("dest"));
+    Element ibscbs = (Element) doc.getElementsByTagNameNS(NS, "IBSCBS").item(0);
+    assertEquals(List.of("cIndOp", "valores"), filhos(ibscbs));
+    DpsCamposFiscaisTest.validarContraXsd(nt009.toXmlString(doc), "schemas/nt009/DPS_v1.01.xsd");
+  }
+
+  @Test
   @DisplayName("cIndOp passa a ser opcional")
   void cIndOpOpcional() throws Exception {
     Ibscbs semIndOp = Ibscbs.builder().indDest("0")

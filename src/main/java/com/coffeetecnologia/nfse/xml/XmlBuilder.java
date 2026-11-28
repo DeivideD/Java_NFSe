@@ -202,6 +202,21 @@ public class XmlBuilder {
       el.appendChild(buildToma(doc, dps.getTomador()));
     }
 
+    // NT 009 (XSD da Sefin de 24/11/2026): indDest e dest saíram de IBSCBS e vêm logo após <toma>.
+    // indDest é obrigatório mesmo sem o grupo IBSCBS; "0" = o tomador é o destinatário.
+    if (leiaute == Leiaute.NT_009) {
+      Ibscbs ibscbs = dps.getIbscbs();
+      String indDest = ibscbs != null && ibscbs.getIndDest() != null && !ibscbs.getIndDest().isBlank()
+          ? ibscbs.getIndDest() : "0";
+      if ("1".equals(indDest) && ibscbs.getDest() == null) {
+        throw new IllegalStateException("IBSCBS.dest é obrigatório quando indDest=\"1\".");
+      }
+      addEl(doc, el, "indDest", indDest);
+      if (ibscbs != null && ibscbs.getDest() != null) {
+        el.appendChild(buildDest(doc, ibscbs.getDest()));
+      }
+    }
+
     // Serviço
     el.appendChild(buildServ(doc, dps.getServico(), municipioPrestacao(dps), leiaute));
 
@@ -632,23 +647,25 @@ public class XmlBuilder {
     if (leiaute == Leiaute.NT_004 && (ibscbs.getCIndOp() == null || ibscbs.getCIndOp().isBlank())) {
       throw new IllegalStateException("IBSCBS.cIndOp é obrigatório quando o grupo IBSCBS é informado.");
     }
-    if (ibscbs.getIndDest() == null || ibscbs.getIndDest().isBlank()) {
-      throw new IllegalStateException("IBSCBS.indDest é obrigatório quando o grupo IBSCBS é informado.");
-    }
-    if ("1".equals(ibscbs.getIndDest()) && ibscbs.getDest() == null) {
-      throw new IllegalStateException("IBSCBS.dest é obrigatório quando indDest=\"1\".");
-    }
-
     Element el = doc.createElementNS(NS, "IBSCBS");
 
     if (leiaute == Leiaute.NT_004) {
+      if (ibscbs.getIndDest() == null || ibscbs.getIndDest().isBlank()) {
+        throw new IllegalStateException("IBSCBS.indDest é obrigatório quando o grupo IBSCBS é informado.");
+      }
+      if ("1".equals(ibscbs.getIndDest()) && ibscbs.getDest() == null) {
+        throw new IllegalStateException("IBSCBS.dest é obrigatório quando indDest=\"1\".");
+      }
       addEl(doc, el, "finNFSe", ibscbs.getFinNFSe());
     }
     addEl(doc, el, "cIndOp", ibscbs.getCIndOp());
-    addEl(doc, el, "indDest", ibscbs.getIndDest());
 
-    if (ibscbs.getDest() != null) {
-      el.appendChild(buildDest(doc, ibscbs.getDest()));
+    // Na NT 009, indDest e dest ficam em infDPS (ver buildInfDps).
+    if (leiaute == Leiaute.NT_004) {
+      addEl(doc, el, "indDest", ibscbs.getIndDest());
+      if (ibscbs.getDest() != null) {
+        el.appendChild(buildDest(doc, ibscbs.getDest()));
+      }
     }
 
     // NT 004: <valores><trib><gIBSCBS><CST/><cClassTrib/>; NT 009: <valores><trib><CST/><cClassTrib/>

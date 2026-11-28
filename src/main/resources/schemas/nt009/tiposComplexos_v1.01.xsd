@@ -831,6 +831,20 @@
 					<xs:documentation>Grupo de informações do DPS relativas ao Tomador de Serviços</xs:documentation>
 				</xs:annotation>
 			</xs:element>
+			<xs:element name="indDest" type="TSRTCIndDest">
+				<xs:annotation>
+					<xs:documentation>
+						A respeito do Destinatário dos serviços
+					</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="dest" type="TCRTCInfoDest" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>
+						Grupo de informações relativas ao Destinatário
+					</xs:documentation>
+				</xs:annotation>
+			</xs:element>
 			<xs:element name="interm" type="TCInfoPessoa" minOccurs="0">
 				<xs:annotation>
 					<xs:documentation>Grupo de informações do DPS relativas ao Intermediário de Serviços</xs:documentation>
@@ -2353,20 +2367,6 @@
 				<xs:annotation>
 					<xs:documentation>
 						Tipo de ente governamental
-					</xs:documentation>
-				</xs:annotation>
-			</xs:element>
-			<xs:element name="indDest" type="TSRTCIndDest">
-				<xs:annotation>
-					<xs:documentation>
-						A respeito do Destinatário dos serviços
-					</xs:documentation>
-				</xs:annotation>
-			</xs:element>
-			<xs:element name="dest" type="TCRTCInfoDest" minOccurs="0">
-				<xs:annotation>
-					<xs:documentation>
-						Grupo de informações relativas ao Destinatário
 					</xs:documentation>
 				</xs:annotation>
 			</xs:element>
